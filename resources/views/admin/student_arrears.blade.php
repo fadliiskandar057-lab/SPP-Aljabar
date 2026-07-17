@@ -333,7 +333,7 @@
     .arrears-icon { width:42px; height:42px; display:grid; place-items:center; border-radius:8px; color:#fff; background:#162d78; box-shadow:0 12px 26px rgba(22,183,232,.32); flex:0 0 auto; }
     .arrears-form .form-label { font-size:.82rem; font-weight:720; color:#475467; }
     .arrears-search { width:min(280px,100%); }
-    .arrears-bubbles { display:flex; flex-wrap:wrap; gap:.45rem; }
+    .arrears-bubbles { display:flex; flex-wrap:wrap; gap:.45rem; min-width:160px; }
     .arrears-bubble { border:1px solid #fecaca; color:#991b1b; background:#fee2e2; border-radius:999px; padding:.35rem .6rem; font-size:.82rem; font-weight:800; transition:transform .16s ease, box-shadow .16s ease; }
     .arrears-bubble:hover { transform:translateY(-2px); box-shadow:0 10px 22px rgba(153,27,27,.12); }
     .arrears-bubble.paid { border-color:#bbf7d0; color:#075f7f; background:#dcfce7; }
