@@ -5,6 +5,7 @@
   "require": {
     "php": "^8.3",
     "ext-gd": "*",
+    "ext-pdo_mysql": "*",
     "ext-zip": "*",
     "barryvdh/laravel-dompdf": "^3.0",
     "guzzlehttp/guzzle": "^7.8",
