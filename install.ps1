@@ -35,8 +35,8 @@ function Require-PhpExtension {
 
 function Require-PhpVersion {
     $version = [version](php -r "echo PHP_VERSION;")
-    if ($version -lt [version]'8.3.0') {
-        throw "Versi PHP CLI $version tidak didukung. Aplikasi ini memerlukan PHP 8.3 atau lebih baru; pilih/instal versi tersebut di Laragon, lalu buka ulang terminal."
+    if ($version -lt [version]'8.4.0') {
+        throw "Versi PHP CLI $version tidak didukung. Aplikasi ini memerlukan PHP 8.4 atau lebih baru; pilih/instal versi tersebut di Laragon, lalu buka ulang terminal."
     }
 }
 

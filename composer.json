@@ -3,7 +3,7 @@
   "type": "project",
   "description": "Aplikasi pembayaran SPP berbasis Laravel untuk TA Sequential Search.",
   "require": {
-    "php": "^8.3",
+    "php": "^8.4",
     "ext-gd": "*",
     "ext-pdo_mysql": "*",
     "ext-zip": "*",

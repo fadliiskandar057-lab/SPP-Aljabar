@@ -36,7 +36,7 @@ Sistem ini dirancang untuk memudahkan manajemen administrasi SPP di sekolah seca
 
 ## Teknologi yang Digunakan
 
-*   **Backend Core**: PHP 8.3+ dengan Framework Laravel 12.
+*   **Backend Core**: PHP 8.4+ dengan Framework Laravel 12.
 *   **Database**: MySQL / MariaDB.
 *   **Frontend**: Vanilla HTML5, CSS3, Javascript, dan template engine Blade.
 *   **Styling & Icons**: Bootstrap v5.3.3 & Bootstrap Icons v1.11.3.
@@ -158,7 +158,7 @@ Sistem ini menggunakan 6 tabel utama:
 
 ## Panduan Instalasi & Konfigurasi
 
-Pastikan komputer Anda sudah terinstal **PHP 8.3+**, **Composer**, **Node.js & NPM**, serta server database **MySQL/MariaDB** (disarankan menggunakan Laragon atau XAMPP).
+Pastikan komputer Anda sudah terinstal **PHP 8.4+**, **Composer**, **Node.js & NPM**, serta server database **MySQL/MariaDB** (disarankan menggunakan Laragon atau XAMPP).
 
 ## Deploy Gratis: Render + TiDB + Brevo API
 
