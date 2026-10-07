@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Pembayaran;
 use Midtrans\Config;
 use Midtrans\Snap;
+use Midtrans\Transaction;
 
 class MidtransService
 {
@@ -52,5 +53,26 @@ class MidtransService
         $signature = hash('sha512', $payload['order_id'].$payload['status_code'].$payload['gross_amount'].config('services.midtrans.server_key'));
 
         return hash_equals($signature, $payload['signature_key'] ?? '');
+    }
+
+    /**
+     * Ask Midtrans directly for the final transaction state.  This must be
+     * used after the Snap callback: callback data lives in the browser and
+     * therefore is never proof of payment.
+     */
+    public function getTransactionStatus(Pembayaran $payment): array
+    {
+        $response = Transaction::status($payment->midtrans_order_id);
+        $payload = json_decode(json_encode($response, JSON_THROW_ON_ERROR), true, 512, JSON_THROW_ON_ERROR);
+
+        if (($payload['order_id'] ?? null) !== $payment->midtrans_order_id) {
+            throw new \RuntimeException('Respons status Midtrans tidak cocok dengan invoice pembayaran.');
+        }
+
+        if ((int) round((float) ($payload['gross_amount'] ?? 0)) !== (int) $payment->nominal) {
+            throw new \RuntimeException('Nominal pada respons Midtrans tidak cocok dengan invoice pembayaran.');
+        }
+
+        return $payload;
     }
 }

@@ -24,6 +24,22 @@ function Require-Command {
     }
 }
 
+function Require-PhpExtension {
+    param([string]$Name)
+
+    $enabled = php -m | Where-Object { $_.Trim().ToLowerInvariant() -eq $Name.ToLowerInvariant() }
+    if (-not $enabled) {
+        throw "Ekstensi PHP '$Name' belum aktif. Aktifkan extension=$Name pada php.ini yang dipakai CLI, lalu buka ulang terminal."
+    }
+}
+
+function Require-PhpVersion {
+    $version = [version](php -r "echo PHP_VERSION;")
+    if ($version -lt [version]'8.3.0') {
+        throw "Versi PHP CLI $version tidak didukung. Aplikasi ini memerlukan PHP 8.3 atau lebih baru; pilih/instal versi tersebut di Laragon, lalu buka ulang terminal."
+    }
+}
+
 function Run-Command {
     param(
         [string]$Title,
@@ -75,6 +91,9 @@ try {
     Require-Command "php" "Install PHP lewat Laragon, lalu buka ulang terminal."
     Require-Command "composer" "Install Composer dari https://getcomposer.org/download/."
     Require-Command "npm" "Install Node.js LTS dari https://nodejs.org/."
+    Require-PhpVersion
+    Require-PhpExtension "gd"
+    Require-PhpExtension "zip"
     Write-Ok "PHP, Composer, dan npm tersedia."
 
     if (-not (Test-Path -LiteralPath ".env")) {
@@ -91,7 +110,7 @@ try {
     $dbUser = Get-EnvValue ".env" "DB_USERNAME" "root"
     $dbPass = Get-EnvValue ".env" "DB_PASSWORD" ""
 
-    Run-Command "Install dependency Laravel" "composer" @("install", "--no-interaction")
+    Run-Command "Install dependency Laravel" "composer" @("install", "--no-interaction", "--no-dev")
     Run-Command "Install dependency frontend" "npm" @("install")
 
     $appKey = Get-EnvValue ".env" "APP_KEY" ""
@@ -202,10 +221,10 @@ echo ((int) $stmt->fetchColumn() > 0) ? "DEMO_DATA=1\n" : "DEMO_DATA=0\n";
 
     if (-not $NoServe) {
         Write-Host ""
-        Write-Host "Server Laravel akan dijalankan di http://127.0.0.1:8000" -ForegroundColor Yellow
+        Write-Host "Mode demo akan menjalankan server, scheduler, dan ngrok bila tersedia." -ForegroundColor Yellow
         Write-Host "Biarkan jendela ini terbuka selama aplikasi digunakan."
         Write-Host ""
-        & php artisan serve --host=127.0.0.1 --port=8000
+        & "$PSScriptRoot\start.ps1" -Tunnel
     }
 } catch {
     Write-Host ""

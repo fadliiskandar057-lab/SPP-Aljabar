@@ -19,12 +19,12 @@ async function finishPayment(result) {
             'X-CSRF-TOKEN': '{{ csrf_token() }}',
             'Accept': 'application/json'
         },
-        body: JSON.stringify({
-            transaction_status: result.transaction_status || 'settlement',
-            transaction_id: result.transaction_id || null
-        })
+        body: '{}'
     });
     const data = await response.json();
+    if (!response.ok) {
+        alert(data.message || 'Status pembayaran belum dapat diverifikasi.');
+    }
     location.href = data.redirect || '{{ route('siswa.riwayat') }}';
 }
 

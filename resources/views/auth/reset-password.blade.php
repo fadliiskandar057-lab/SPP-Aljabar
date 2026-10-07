@@ -1,0 +1,4 @@
+@extends('layouts.app')
+@section('content')
+<div class="container py-5" style="max-width:480px"><div class="content-card p-4"><h3>Atur Ulang Kata Sandi</h3><form method="post" action="{{ route('password.update') }}">@csrf<input type="hidden" name="token" value="{{ $token }}"><label class="form-label">Email</label><input class="form-control" type="email" name="email" value="{{ old('email',$email) }}" required><label class="form-label mt-3">Kata sandi baru</label><input class="form-control" type="password" name="password" minlength="8" required><label class="form-label mt-3">Ulangi kata sandi</label><input class="form-control" type="password" name="password_confirmation" minlength="8" required><button class="btn btn-primary w-100 mt-3">Simpan Kata Sandi Baru</button></form></div></div>
+@endsection

@@ -5,12 +5,12 @@
     <div>
         <span class="report-kicker">Laporan Keuangan</span>
         <h3>Laporan Bulanan</h3>
-        <p>Filter laporan, export PDF/Excel, dan cari nama atau NIS memakai Sequential Search.</p>
+        <p>Ringkasan berdasarkan periode tagihan. Tanggal pembayaran aktual tersedia pada detail setiap tagihan.</p>
     </div>
     <div class="d-flex flex-wrap gap-2">
-        <a class="btn btn-outline-danger" href="{{ auth()->user()->role === 'kepala_sekolah' ? route('kepala.laporan.pdf', request()->query()) : route('admin.laporan.pdf', request()->query()) }}"><i class="bi bi-filetype-pdf"></i>PDF</a>
+        <a class="btn btn-outline-danger" href="{{ auth()->user()->role === 'kepala_sekolah' ? route('kepala.laporan.pdf', request()->query()) : route('treasury.laporan.pdf', request()->query()) }}"><i class="bi bi-filetype-pdf"></i>PDF</a>
         @if(auth()->user()->role === 'admin_tu')
-            <a class="btn btn-outline-success" href="{{ route('admin.laporan.excel', request()->query()) }}"><i class="bi bi-file-earmark-spreadsheet"></i>Excel</a>
+            <a class="btn btn-outline-success" href="{{ route('treasury.laporan.excel', request()->query()) }}"><i class="bi bi-file-earmark-spreadsheet"></i>Excel</a>
         @endif
     </div>
 </div>
@@ -18,7 +18,7 @@
 <div class="content-card p-3 mb-3 report-filter-card">
     <form class="row g-3 align-items-end" data-auto-submit>
         <div class="col-lg-2 col-md-4">
-            <label class="form-label">Dari Tahun</label>
+            <label class="form-label">Dari Tahun Tagihan</label>
             <select name="tahun_awal" class="form-select">
                 <option value="">Tahun awal</option>
                 @foreach($yearOptions as $year)
@@ -27,7 +27,7 @@
             </select>
         </div>
         <div class="col-lg-2 col-md-4">
-            <label class="form-label">Dari Bulan</label>
+            <label class="form-label">Dari Bulan Tagihan</label>
             <select name="bulan_awal" class="form-select">
                 <option value="">Januari</option>
                 @foreach($months as $number => $name)
@@ -36,7 +36,7 @@
             </select>
         </div>
         <div class="col-lg-2 col-md-4">
-            <label class="form-label">Sampai Tahun</label>
+            <label class="form-label">Sampai Tahun Tagihan</label>
             <select name="tahun_akhir" class="form-select">
                 <option value="">Tahun akhir</option>
                 @foreach($yearOptions as $year)
@@ -45,7 +45,7 @@
             </select>
         </div>
         <div class="col-lg-2 col-md-4">
-            <label class="form-label">Sampai Bulan</label>
+            <label class="form-label">Sampai Bulan Tagihan</label>
             <select name="bulan_akhir" class="form-select">
                 <option value="">Desember</option>
                 @foreach($months as $number => $name)
@@ -82,7 +82,7 @@
     </form>
     @if(request()->hasAny(['bulan_awal', 'bulan_akhir', 'tahun_awal', 'tahun_akhir', 'kelas_id', 'status', 'keyword']))
         <div class="mt-3">
-            <a class="btn btn-sm btn-outline-secondary" href="{{ route('admin.laporan') }}"><i class="bi bi-x-circle"></i> Reset Filter</a>
+            <a class="btn btn-sm btn-outline-secondary" href="{{ route('treasury.laporan') }}"><i class="bi bi-x-circle"></i> Reset Filter</a>
         </div>
     @endif
 </div>
@@ -90,7 +90,7 @@
 <div class="row g-3 mb-3">
     <div class="col-md-6">
         <div class="metric-card report-metric report-metric-income">
-            <div class="metric-label">Total Pemasukan</div>
+            <div class="metric-label">Nilai Tagihan Lunas</div>
             <div class="metric-value">Rp {{ number_format($summary['pemasukan'], 0, ',', '.') }}</div>
         </div>
     </div>
@@ -115,7 +115,7 @@
     </div>
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0 report-table" id="reportTable">
-            <thead><tr><th>NIS</th><th>Nama</th><th>Kelas</th><th>Status</th><th>Rentang Bulan</th><th>Jumlah Bulan</th><th>Total Nominal</th></tr></thead>
+            <thead><tr><th>NIS</th><th>Nama</th><th>Kelas</th><th>Status</th><th>Rentang Periode Tagihan</th><th>Jumlah Bulan</th><th>Total Nominal</th></tr></thead>
             <tbody>
                 @forelse($reportRows as $row)
                     @php $modalId = 'reportDetail'.$loop->iteration; @endphp

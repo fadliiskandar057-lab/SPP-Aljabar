@@ -6,7 +6,7 @@
         <div class="role-hero-copy">
             <span class="role-kicker"><i class="bi bi-graph-up-arrow"></i>Analitik Pemasukan</span>
             <h3>Grafik Pemasukan {{ $year }}</h3>
-            <p>Visualisasi tren pemasukan bulanan dan rasio status tagihan untuk membantu membaca kondisi pembayaran sekolah.</p>
+            <p>Visualisasi pemasukan berdasarkan tanggal transaksi pembayaran dan rasio status tagihan.</p>
         </div>
         <div class="role-hero-actions"><span class="role-icon-tile"><i class="bi bi-bar-chart-line"></i></span></div>
     </section>
@@ -17,7 +17,7 @@
                 <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
                     <div>
                         <h6 class="mb-1 fw-bold">Pemasukan Bulanan</h6>
-                        <span class="text-muted small">Januari sampai Desember {{ $year }}</span>
+                        <span class="text-muted small">Berdasarkan tanggal pembayaran: Januari sampai Desember {{ $year }}</span>
                     </div>
                     <span class="role-chip"><i class="bi bi-calendar3"></i>{{ $year }}</span>
                 </div>
@@ -31,6 +31,10 @@
                 <div class="mt-3" style="height:310px"><canvas id="principalStatusChart"></canvas></div>
             </div>
         </div>
+    </div>
+    <div class="alert alert-info mt-3 mb-0 small" role="note">
+        <i class="bi bi-info-circle me-1"></i>
+        Tahun pada grafik adalah <strong>tahun transaksi</strong> (tanggal pembayaran diterima). Tahun pada laporan bulanan adalah <strong>periode tagihan</strong>. Contohnya, tagihan September 2025 yang dibayar pada 2026 akan tercatat di laporan periode September 2025 dan grafik pemasukan 2026.
     </div>
 </div>
 

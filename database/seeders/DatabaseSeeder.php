@@ -18,9 +18,10 @@ class DatabaseSeeder extends Seeder
         $tahun = TahunAjaran::create(['nama' => '2025/2026', 'is_active' => true]);
         $kelas = collect(['X-A', 'X-B', 'X-C', 'XI-A', 'XI-B', 'XII-A', 'XII-B'])->map(fn ($nama) => Kelas::create(['nama_kelas' => $nama]));
 
-        User::create(['name' => 'Admin TU', 'username' => 'admin', 'password' => Hash::make('password'), 'role' => 'admin_tu']);
-        User::create(['name' => 'Kepala Sekolah', 'username' => 'kepala', 'password' => Hash::make('password'), 'role' => 'kepala_sekolah']);
-        User::create(['name' => 'Wali Kelas X-A', 'username' => 'wali', 'password' => Hash::make('password'), 'role' => 'wali_kelas', 'kelas_id' => $kelas->first()->id]);
+        User::updateOrCreate(['username' => 'admin'], ['name' => 'Admin Manajemen', 'email' => 'admin@aljabbar.test', 'password' => Hash::make('password'), 'role' => 'admin_tu']);
+        User::updateOrCreate(['username' => 'bendahara'], ['name' => 'Bendahara', 'email' => 'bendahara@aljabbar.test', 'password' => Hash::make('password'), 'role' => 'bendahara']);
+        User::updateOrCreate(['username' => 'kepala'], ['name' => 'Kepala Sekolah', 'email' => 'kepala@aljabbar.test', 'nip' => '197001011990011001', 'is_report_signer' => true, 'password' => Hash::make('password'), 'role' => 'kepala_sekolah']);
+        User::updateOrCreate(['username' => 'wali'], ['name' => 'Wali Kelas X-A', 'password' => Hash::make('password'), 'role' => 'wali_kelas', 'kelas_id' => $kelas->first()->id]);
 
         foreach ($kelas as $class) {
             BiayaSpp::create(['tahun_ajaran_id' => $tahun->id, 'kelas_id' => $class->id, 'nominal' => 250000 + ($class->id * 10000)]);

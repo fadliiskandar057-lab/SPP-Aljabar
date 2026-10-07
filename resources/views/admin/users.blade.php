@@ -3,13 +3,15 @@
 @section('content')
 @php
     $roleLabels = [
-        'admin_tu' => 'Admin TU',
+        'admin_tu' => 'Admin Manajemen',
+        'bendahara' => 'Bendahara',
         'kepala_sekolah' => 'Kepala Sekolah',
         'wali_kelas' => 'Wali Kelas',
         'siswa' => 'Siswa / Orang Tua',
     ];
     $roleIcons = [
         'admin_tu' => 'bi-shield-check',
+        'bendahara' => 'bi-cash-coin',
         'kepala_sekolah' => 'bi-mortarboard',
         'wali_kelas' => 'bi-person-video3',
         'siswa' => 'bi-people',
@@ -84,7 +86,7 @@
     </div>
     <div class="user-stat">
         <div class="user-stat-icon"><i class="bi bi-shield-check"></i></div>
-        <div><span>Admin TU</span><strong>{{ $users->where('role', 'admin_tu')->count() }}</strong></div>
+        <div><span>Admin Manajemen</span><strong>{{ $users->where('role', 'admin_tu')->count() }}</strong></div>
     </div>
     <div class="user-stat">
         <div class="user-stat-icon"><i class="bi bi-mortarboard"></i></div>
@@ -114,7 +116,8 @@
         <div class="col-lg-2 col-md-6">
             <label class="form-label">Role</label>
             <select name="role" class="form-select">
-                <option value="admin_tu">Admin TU</option>
+                <option value="admin_tu">Admin Manajemen</option>
+                <option value="bendahara">Bendahara</option>
                 <option value="kepala_sekolah">Kepala Sekolah</option>
                 <option value="wali_kelas">Wali Kelas</option>
                 <option value="siswa">Siswa / Orang Tua</option>

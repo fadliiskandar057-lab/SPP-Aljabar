@@ -19,6 +19,7 @@ Aplikasi web pembayaran SPP berbasis Laravel untuk membantu pengelolaan tagihan,
 9. [Panduan Penggunaan Akun Demo](#panduan-penggunaan-akun-demo)
 10. [Struktur Folder Utama](#struktur-folder-utama)
 11. [Catatan Deployment Server](#catatan-deployment-server)
+12. [Deploy Gratis: Render + TiDB + Brevo API](#deploy-gratis-render--tidb--brevo-api)
 
 ---
 
@@ -35,7 +36,7 @@ Sistem ini dirancang untuk memudahkan manajemen administrasi SPP di sekolah seca
 
 ## Teknologi yang Digunakan
 
-*   **Backend Core**: PHP 8.2+ dengan Framework Laravel 11.
+*   **Backend Core**: PHP 8.3+ dengan Framework Laravel 12.
 *   **Database**: MySQL / MariaDB.
 *   **Frontend**: Vanilla HTML5, CSS3, Javascript, dan template engine Blade.
 *   **Styling & Icons**: Bootstrap v5.3.3 & Bootstrap Icons v1.11.3.
@@ -157,9 +158,77 @@ Sistem ini menggunakan 6 tabel utama:
 
 ## Panduan Instalasi & Konfigurasi
 
-Pastikan komputer Anda sudah terinstal **PHP 8.2+**, **Composer**, **Node.js & NPM**, serta server database **MySQL/MariaDB** (disarankan menggunakan Laragon atau XAMPP).
+Pastikan komputer Anda sudah terinstal **PHP 8.3+**, **Composer**, **Node.js & NPM**, serta server database **MySQL/MariaDB** (disarankan menggunakan Laragon atau XAMPP).
+
+## Deploy Gratis: Render + TiDB + Brevo API
+
+Konfigurasi ini ditujukan untuk **demo/TA**, bukan layanan sekolah yang harus selalu aktif. Render Free akan tidur setelah 15 menit tanpa kunjungan, file upload di server akan hilang saat restart, dan scheduler tidak berjalan terus-menerus.
+
+### 1. Unggah kode ke GitHub
+
+Jangan unggah `.env`, file ZIP, folder `vendor`, atau data rahasia. Pastikan perubahan berikut sudah masuk repository: `Dockerfile`, `.dockerignore`, folder `docker/`, dan `render.yaml`.
+
+### 2. Buat Web Service di Render
+
+1. Masuk ke [Render Dashboard](https://dashboard.render.com/), klik **New** lalu **Blueprint**.
+2. Hubungkan repository GitHub proyek ini dan pilih branch utama.
+3. Render membaca `render.yaml`; pilih plan **Free** lalu buat service.
+4. Setelah service dibuat, buka **Environment**. Isi setiap variabel yang bertanda `sync: false` pada Blueprint.
+5. Salin URL Render, misalnya `https://spp-al-jabbar.onrender.com`, lalu isi sebagai `APP_URL` dan deploy ulang.
+
+### 3. Buat database TiDB Cloud Starter
+
+1. Daftar di [TiDB Cloud](https://tidbcloud.com/) dan buat **TiDB Cloud Starter** (MySQL-compatible).
+2. Pada halaman instance, klik **Connect** dan salin host, username, password, port, dan nama database.
+3. Masukkan ke Environment Render:
+
+```env
+DB_CONNECTION=mysql
+DB_HOST=HOST_DARI_TIDB
+DB_PORT=4000
+DB_DATABASE=test
+DB_USERNAME=USERNAME_DARI_TIDB
+DB_PASSWORD=PASSWORD_DARI_TIDB
+MYSQL_ATTR_SSL_CA=/etc/ssl/certs/ca-certificates.crt
+```
+
+TiDB Starter mewajibkan TLS. Jangan menonaktifkan `MYSQL_ATTR_SSL_CA`.
+
+### 4. Pindahkan data lokal
+
+Sebelum import, buat cadangan database lokal:
+
+```powershell
+mysqldump -u root -p spp_al_jabbar > spp_al_jabbar_backup.sql
+```
+
+Gunakan SQL Editor TiDB atau MySQL client dengan parameter dari menu **Connect** untuk mengimpor file tersebut. Simpan file backup di tempat aman; jangan commit ke Git.
+
+### 5. Isi Brevo API untuk reset password
+
+Render Free memblokir SMTP pada port 587. Karena itu aplikasi menggunakan Brevo API HTTPS jika `BREVO_API_KEY` tersedia:
+
+```env
+BREVO_API_KEY=API_KEY_BREVO
+BREVO_SENDER_EMAIL=ALAMAT_PENGIRIM_TERVERIFIKASI
+BREVO_SENDER_NAME="SPP Al Jabbar"
+```
+
+Ambil API key di Brevo **Settings → SMTP & API → API Keys**. Sender email harus sudah diverifikasi di Brevo. Jangan gunakan SMTP key di variabel ini.
+
+### 6. Variabel produksi lain
+
+Isi juga `MIDTRANS_SERVER_KEY`, `MIDTRANS_CLIENT_KEY`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, dan `VAPID_SUBJECT` dengan nilai produksi Anda. Setelah deploy berhasil, buka URL aplikasi, login, dan uji reset password dengan akun demo/non-produksi terlebih dahulu.
+
+### Menjalankan Saat Demo/Sidang
+
+Setelah instalasi berhasil, cukup klik dua kali **`start.bat`**. File ini menjalankan aplikasi dan scheduler Laravel; bila `ngrok` tersedia, tunnel juga dijalankan otomatis dan URL webhook dicetak di jendela terminal. URL webhook cukup dipasang sekali pada Midtrans Sandbox di **Settings > Payment > Notification URL**.
+
+Ngrok adalah cadangan webhook, bukan syarat agar transaksi dapat dicatat: setelah Snap selesai, aplikasi memverifikasi status langsung ke server Midtrans. Karena itu localhost tetap dapat digunakan. Pembayaran Sandbox tetap membutuhkan koneksi internet untuk halaman Snap dan verifikasi ke Midtrans.
 
 ### Langkah-Langkah Instalasi:
+
+Cara termudah di Windows adalah menjalankan **`install.bat`**, lalu pilih menu sesuai kebutuhan. Installer akan memeriksa kebutuhan aplikasi, memasang dependency, membuat database bila belum ada, menjalankan migration/seeder, dan dapat langsung menjalankan aplikasi.
 
 1.  **Clone / Unduh Repository**:
     Ekstrak project ke folder web server Anda (misal `C:\laragon\www\spp-al-jabbar`).

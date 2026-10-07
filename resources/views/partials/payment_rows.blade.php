@@ -28,9 +28,10 @@
             @else
                 <span class="text-muted small">Belum tersedia</span>
             @endif
-            @if(auth()->user()?->role === 'admin_tu' && $payment->metode === 'manual' && $payment->status === 'success')
-                <form method="post" action="{{ route('admin.payments.cancel', $payment) }}" class="d-inline" onsubmit="return confirm('Batalkan transaksi manual ini? Tagihan akan dibuka ulang jika tidak ada pembayaran sukses lain.')">
+            @if(auth()->user()?->role === 'bendahara' && $payment->metode === 'manual' && $payment->status === 'success')
+                <form method="post" action="{{ route('treasury.payments.cancel', $payment) }}" class="d-inline" onsubmit="return confirm('Batalkan transaksi manual ini? Tagihan akan dibuka ulang jika tidak ada pembayaran sukses lain.')">
                     @csrf
+                    <input class="form-control form-control-sm d-inline-block me-1" style="width:150px" name="reason" required maxlength="1000" placeholder="Alasan pembatalan">
                     <button class="btn btn-sm btn-outline-danger"><i class="bi bi-x-circle"></i>Batalkan</button>
                 </form>
             @endif

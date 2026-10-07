@@ -25,7 +25,7 @@
     </div>
     <form class="row g-3 align-items-end" data-auto-submit>
         <div class="col-md-3">
-            <label class="form-label">Dari Tahun</label>
+            <label class="form-label">Dari Tahun Tagihan</label>
             <select name="tahun_awal" class="form-select">
                 <option value="">Tahun awal</option>
                 @foreach($yearOptions as $year)
@@ -34,7 +34,7 @@
             </select>
         </div>
         <div class="col-md-3">
-            <label class="form-label">Dari Bulan</label>
+            <label class="form-label">Dari Bulan Tagihan</label>
             <select name="bulan_awal" class="form-select">
                 <option value="">Januari</option>
                 @foreach($months as $number => $name)
@@ -43,7 +43,7 @@
             </select>
         </div>
         <div class="col-md-3">
-            <label class="form-label">Sampai Tahun</label>
+            <label class="form-label">Sampai Tahun Tagihan</label>
             <select name="tahun_akhir" class="form-select">
                 <option value="">Tahun akhir</option>
                 @foreach($yearOptions as $year)
@@ -52,7 +52,7 @@
             </select>
         </div>
         <div class="col-md-3">
-            <label class="form-label">Sampai Bulan</label>
+            <label class="form-label">Sampai Bulan Tagihan</label>
             <select name="bulan_akhir" class="form-select">
                 <option value="">Desember</option>
                 @foreach($months as $number => $name)
@@ -83,7 +83,7 @@
     </div>
     <div class="table-responsive">
         <table class="table table-sm align-middle principal-report-table" id="principalMonthlyTable">
-            <thead><tr><th>NIS</th><th>Nama</th><th>Kelas</th><th>Status</th><th>Rentang Bulan</th><th>Jumlah Bulan</th><th>Total Nominal</th></tr></thead>
+            <thead><tr><th>NIS</th><th>Nama</th><th>Kelas</th><th>Status</th><th>Rentang Periode Tagihan</th><th>Jumlah Bulan</th><th>Total Nominal</th></tr></thead>
             <tbody>
                 @forelse($reportRows as $row)
                     @php $modalId = 'principalReportDetail'.$loop->iteration; @endphp

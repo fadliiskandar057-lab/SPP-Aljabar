@@ -152,6 +152,23 @@
         box-shadow:0 14px 28px rgba(22,45,120,.18);
     }
     .tta-login-submit:hover { background:#0e205a; border-color:#0e205a; }
+    .tta-forgot-password {
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        gap:.45rem;
+        min-height:44px;
+        margin-top:.85rem;
+        border:1px solid #b9dce9;
+        border-radius:8px;
+        color:var(--tta-navy);
+        background:#f7fcfe;
+        font-weight:800;
+        text-decoration:none;
+        transition:background .18s ease, border-color .18s ease, color .18s ease, transform .18s ease;
+    }
+    .tta-forgot-password:hover { color:#fff; border-color:var(--tta-sky-dark); background:var(--tta-sky-dark); transform:translateY(-1px); }
+    .tta-forgot-password:focus-visible { outline:3px solid rgba(22,183,232,.35); outline-offset:2px; }
     .tta-login-note {
         margin-top:1rem;
         padding:1rem;
@@ -170,6 +187,7 @@
         .tta-login-visual,.tta-login-form-zone { padding:1rem; }
         .tta-login-points { grid-template-columns:1fr; }
         .tta-login-card-head,.tta-login-body { padding:1rem; }
+        .tta-forgot-password { min-height:46px; }
     }
 </style>
 
@@ -194,7 +212,7 @@
                 </div>
                 <div class="tta-login-point">
                     <i class="bi bi-cash-coin"></i>
-                    <strong>Admin TU</strong>
+                    <strong>Admin Manajemen</strong>
                     <span>Data siswa dan transaksi</span>
                 </div>
                 <div class="tta-login-point">
@@ -213,7 +231,7 @@
                 <div>
                     <span class="tta-login-badge"><i class="bi bi-lock"></i>Akses Portal</span>
                     <h2>Masuk Sistem</h2>
-                    <p>Gunakan NIS untuk siswa/orang tua atau username untuk Admin TU dan Kepala Sekolah.</p>
+                    <p>Gunakan NIS, username, atau alamat email akun Anda untuk masuk ke portal.</p>
                 </div>
             </div>
 
@@ -221,9 +239,9 @@
                 <form method="post" action="{{ route('login.post') }}">
                     @csrf
                     <div class="tta-login-field">
-                        <label class="form-label">Username / NIS</label>
+                        <label class="form-label" for="login">Username, NIS, atau email</label>
                         <i class="bi bi-person"></i>
-                        <input name="username" class="form-control" value="{{ old('username') }}" autocomplete="username" required>
+                        <input id="login" name="login" class="form-control" value="{{ old('login') }}" autocomplete="username" required autofocus>
                     </div>
                     <div class="tta-login-field">
                         <label class="form-label">Password</label>
@@ -231,10 +249,11 @@
                         <input name="password" type="password" class="form-control" autocomplete="current-password" required>
                     </div>
                     <button class="btn btn-primary w-100 tta-login-submit" type="submit"><i class="bi bi-box-arrow-in-right"></i>Masuk Portal</button>
+                    <a class="tta-forgot-password" href="{{ route('password.request') }}"><i class="bi bi-key"></i>Lupa kata sandi?</a>
                 </form>
 
                 <div class="tta-login-note small">
-                    Hak akses akan mengikuti akun yang digunakan saat login, sehingga tampilan siswa, Admin TU, dan Kepala Sekolah tetap terpisah.
+                    Hak akses mengikuti akun yang digunakan saat login, sehingga tampilan setiap role tetap terpisah.
                 </div>
             </div>
         </div>

@@ -58,7 +58,7 @@
                         <td><strong class="cash-money">Rp {{ number_format($p->nominal,0,',','.') }}</strong></td>
                         <td class="text-end text-nowrap">
                             <x-whatsapp-link :phone="$p->siswa->no_hp_orang_tua" :message="$message" label="WA" class="btn btn-sm btn-success" />
-                            <form class="d-inline" method="post" action="{{ route('admin.cash.confirm',$p) }}">
+                            <form class="d-inline" method="post" action="{{ route('treasury.cash.confirm',$p) }}">
                                 @csrf
                                 <button class="btn btn-sm btn-outline-success" onclick="return confirm('Konfirmasi pembayaran tunai {{ $p->siswa->nama }} bulan {{ $p->tagihan->bulan }} sebagai lunas?')">Konfirmasi Lunas</button>
                             </form>

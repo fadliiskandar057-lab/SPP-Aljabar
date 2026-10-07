@@ -45,7 +45,7 @@
 
         <div class="d-grid gap-2">
             <button id="pay-button" class="btn btn-primary btn-lg"><i class="bi bi-qr-code-scan me-2"></i>Buka Midtrans Snap</button>
-            <a href="{{ route('admin.arrears.students') }}" class="btn btn-outline-secondary">Kembali ke Tunggakan</a>
+            <a href="{{ route('treasury.arrears.students') }}" class="btn btn-outline-secondary">Kembali ke Tunggakan</a>
         </div>
     </div>
 </div>
@@ -54,26 +54,26 @@
 <script src="{{ config('services.midtrans.is_production') ? 'https://app.midtrans.com/snap/snap.js' : 'https://app.sandbox.midtrans.com/snap/snap.js' }}" data-client-key="{{ config('services.midtrans.client_key') }}"></script>
 <script>
 async function finishPayment(result) {
-    const response = await fetch('{{ route('admin.arrears.midtrans.finish', $pembayaran) }}', {
+    const response = await fetch('{{ route('treasury.arrears.midtrans.finish', $pembayaran) }}', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'X-CSRF-TOKEN': '{{ csrf_token() }}',
             'Accept': 'application/json'
         },
-        body: JSON.stringify({
-            transaction_status: result.transaction_status || 'settlement',
-            transaction_id: result.transaction_id || null
-        })
+        body: '{}'
     });
     const data = await response.json();
-    location.href = data.redirect || '{{ route('admin.arrears.students') }}';
+    if (!response.ok) {
+        alert(data.message || 'Status pembayaran belum dapat diverifikasi.');
+    }
+    location.href = data.redirect || '{{ route('treasury.arrears.students') }}';
 }
 
 document.getElementById('pay-button').onclick = function () {
     snap.pay('{{ $snapToken }}', {
         onSuccess: finishPayment,
-        onPending: function () { location.href = '{{ route('admin.arrears.students') }}'; },
+        onPending: function () { location.href = '{{ route('treasury.arrears.students') }}'; },
         onError: function () { alert('Pembayaran gagal'); }
     });
 };

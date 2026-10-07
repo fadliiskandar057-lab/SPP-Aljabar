@@ -7,15 +7,19 @@
         <h3>Tunggakan Siswa</h3>
         <p>Atur bulan terakhir siswa membayar, siapkan tagihan sesuai jadwal tagihan otomatis, lalu konfirmasi tunggakan dari bubble bulan.</p>
     </div>
-    <button class="btn btn-primary arrears-primary-action" type="button" data-bs-toggle="modal" data-bs-target="#setLastPaidModal">
-        <i class="bi bi-calendar-plus"></i> Set Terakhir Bayar
-    </button>
+    <div class="d-flex gap-2"><button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#futurePaymentModal"><i class="bi bi-calendar-check"></i> Bayar Masa Depan</button><button class="btn btn-primary arrears-primary-action" type="button" data-bs-toggle="modal" data-bs-target="#setLastPaidModal"><i class="bi bi-calendar-plus"></i> Set Terakhir Bayar</button></div>
 </div>
+
+<div class="modal fade" id="futurePaymentModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="post" action="{{ route('treasury.arrears.future-payment') }}">@csrf
+    <div class="modal-header"><h5 class="modal-title">Bayar SPP Sampai Periode Mendatang</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body row g-3"><div class="col-12"><label class="form-label">Siswa</label><select name="siswa_id" class="form-select" required><option value="">Pilih siswa</option>@foreach($siswaOptions as $item)<option value="{{ $item->id }}">{{ $item->nis }} - {{ $item->nama }}</option>@endforeach</select></div><div class="col-12"><label class="form-label">Tahun ajaran</label><select name="tahun_ajaran_id" class="form-select" required>@foreach($tahun as $t)<option value="{{ $t->id }}" @selected($activeYear?->id === $t->id)>{{ $t->nama }}</option>@endforeach</select></div><div class="col-6"><label class="form-label">Sampai bulan</label><select name="until_month" class="form-select">@foreach($months as $number => $name)<option value="{{ $number }}" @selected(now()->month === $number)>{{ $name }}</option>@endforeach</select></div><div class="col-6"><label class="form-label">Tahun</label><input name="until_year" type="number" min="2020" max="2100" value="{{ now()->year }}" class="form-control" required></div></div>
+    <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button><button class="btn btn-success">Proses Pelunasan</button></div>
+</form></div></div></div>
 
 <div class="modal fade" id="setLastPaidModal" tabindex="-1" aria-labelledby="setLastPaidModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
-            <form method="post" action="{{ route('admin.arrears.set-last-paid') }}" class="arrears-form">
+            <form method="post" action="{{ route('treasury.arrears.set-last-paid') }}" class="arrears-form">
                 @csrf
                 <div class="modal-header">
                     <div class="d-flex align-items-start gap-3">
@@ -110,7 +114,7 @@
                         @endfor
                     </select>
                     @if(request()->hasAny(['keyword', 'kelas_id', 'min_arrears_months']))
-                        <a class="btn btn-sm btn-outline-secondary" href="{{ route('admin.arrears.students') }}">Reset</a>
+                        <a class="btn btn-sm btn-outline-secondary" href="{{ route('treasury.arrears.students') }}">Reset</a>
                     @endif
                 </form>
             </div>
@@ -200,7 +204,7 @@
                                                         $paidMonthNumber = array_search($paidBill->bulan, $months, true) ?: $paidBill->bulan;
                                                         $paidCode = $paidMonthNumber.'-'.substr((string) $paidBill->tahun, -2);
                                                     @endphp
-                                                    <form method="post" action="{{ route('admin.arrears.reopen-bill', [$item, $paidBill]) }}" class="d-inline" onsubmit="return confirm('Buka ulang tagihan {{ $paidBill->bulan }} {{ $paidBill->tahun }}? Transaksi manual terkait akan dibatalkan.')">
+                                                    <form method="post" action="{{ route('treasury.arrears.reopen-bill', [$item, $paidBill]) }}" class="d-inline" onsubmit="return confirm('Buka ulang tagihan {{ $paidBill->bulan }} {{ $paidBill->tahun }}? Transaksi manual terkait akan dibatalkan.')">
                                                         @csrf
                                                         <button class="arrears-bubble paid" type="submit">{{ $paidCode }}</button>
                                                     </form>
@@ -285,7 +289,7 @@
                     <div class="tab-content" id="paymentTabContent{{ $bill->id }}">
                         <!-- Tab 1: Manual / Cash -->
                         <div class="tab-pane fade show active" id="cash-pane-{{ $bill->id }}" role="tabpanel" aria-labelledby="cash-tab-{{ $bill->id }}">
-                            <form method="post" action="{{ route('admin.arrears.confirm-through', [$modalStudent, $bill]) }}" enctype="multipart/form-data">
+                            <form method="post" action="{{ route('treasury.arrears.confirm-through', [$modalStudent, $bill]) }}" enctype="multipart/form-data">
                                 @csrf
                                 <div class="modal-body">
                                     <p class="mb-2">Konfirmasi bahwa pembayaran tunai dari <strong>{{ $modalStudent->nama }}</strong> sudah diterima sampai <strong>{{ $bill->bulan }} {{ $bill->tahun }}</strong>?</p>
@@ -307,7 +311,7 @@
 
                         <!-- Tab 2: Midtrans -->
                         <div class="tab-pane fade" id="midtrans-pane-{{ $bill->id }}" role="tabpanel" aria-labelledby="midtrans-tab-{{ $bill->id }}">
-                            <form method="post" action="{{ route('admin.arrears.midtrans', [$modalStudent, $bill]) }}">
+                            <form method="post" action="{{ route('treasury.arrears.midtrans', [$modalStudent, $bill]) }}">
                                 @csrf
                                 <div class="modal-body">
                                     <p class="mb-2">Bayar tunggakan untuk <strong>{{ $modalStudent->nama }}</strong> sampai <strong>{{ $bill->bulan }} {{ $bill->tahun }}</strong> menggunakan Midtrans?</p>

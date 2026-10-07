@@ -280,7 +280,7 @@
         </tr>
         <tr>
             <td class="detail-label">Diverifikasi Oleh</td>
-            <td class="detail-value">{{ $payment->verifier->name ?? 'Admin TU Digital' }}</td>
+            <td class="detail-value">{{ $payment->verifier->name ?? 'Bendahara' }}</td>
         </tr>
     </table>
 
@@ -301,9 +301,9 @@
                 <div>Dicetak pada {{ now()->format('d/m/Y H:i') }}</div>
             </td>
             <td class="signature">
-                Admin TU,
+                Bendahara,
                 <div class="signature-space"></div>
-                <span class="signature-name">{{ $payment->verifier->name ?? 'Admin TU Digital' }}</span>
+                <span class="signature-name">{{ $payment->verifier->name ?? 'Bendahara' }}</span>
             </td>
         </tr>
     </table>

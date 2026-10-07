@@ -21,7 +21,7 @@
         </div>
         <span class="payments-badge">{{ $unpaidBills->count() }} tagihan tersedia</span>
     </div>
-    <form class="row g-3 align-items-end" method="post" action="{{ route('admin.payments.manual') }}">
+    <form class="row g-3 align-items-end" method="post" action="{{ route('treasury.payments.manual') }}">
         @csrf
         <div class="col-lg-3 col-md-6">
             <label class="form-label">Cari Tagihan</label>
@@ -55,7 +55,7 @@
         <div class="d-flex flex-wrap align-items-center gap-2">
             <div class="payments-search">
                 <i class="bi bi-search"></i>
-                <input class="form-control form-control-sm" placeholder="Cari invoice, NIS, nama, bulan, tanggal..." data-sequential-url="{{ route('admin.payments.search') }}" data-results-target="#adminPaymentsRows" data-meta-target="#adminPaymentsMeta" data-include-cancelled-target="#showCancelled">
+                <input class="form-control form-control-sm" placeholder="Cari invoice, NIS, nama, bulan, tanggal..." data-sequential-url="{{ route('treasury.payments.search') }}" data-results-target="#adminPaymentsRows" data-meta-target="#adminPaymentsMeta" data-include-cancelled-target="#showCancelled">
             </div>
             <div class="form-check mb-0 payments-check">
                 <input id="showCancelled" class="form-check-input" type="checkbox">

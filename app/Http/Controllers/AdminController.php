@@ -16,13 +16,16 @@ use App\Models\TahunAjaran;
 use App\Models\User;
 use App\Services\SequentialSearchService;
 use App\Services\MidtransPendingPaymentCleaner;
+use App\Services\MidtransPaymentProcessor;
 use App\Services\WebNotificationService;
+use App\Services\ActivityLogger;
 use App\Services\MidtransService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
 use Throwable;
@@ -436,6 +439,46 @@ class AdminController extends Controller
         return back()->with('success', "Tunggakan {$siswa->nama} disiapkan sampai {$this->months()[$targetMonth->month]} {$targetMonth->year}. {$result['created']} tagihan baru dibuat, {$result['baseline_paid']} tagihan lama ditandai sudah dibayar.");
     }
 
+    public function settleFuturePayments(Request $request, ActivityLogger $activities)
+    {
+        $data = $request->validate([
+            'siswa_id' => ['required', 'exists:siswa,id'],
+            'tahun_ajaran_id' => ['required', 'exists:tahun_ajaran,id'],
+            'until_month' => ['required', 'integer', 'between:1,12'],
+            'until_year' => ['required', 'integer', 'between:2020,2100'],
+            'paid_at' => ['nullable', 'date'],
+        ]);
+
+        $siswa = Siswa::with('kelas')->findOrFail($data['siswa_id']);
+        abort_unless($siswa->status === 'aktif', 422);
+        $until = Carbon::create($data['until_year'], $data['until_month'], 1)->startOfMonth();
+        $fee = $this->feeForStudent($siswa, (int) $data['tahun_ajaran_id']);
+        if (! $fee) return back()->withErrors(['biaya' => 'Biaya SPP siswa belum diatur.']);
+
+        $created = DB::transaction(function () use ($siswa, $data, $until, $fee) {
+            $cursor = now()->startOfMonth();
+            $count = 0;
+            while ($cursor->lte($until)) {
+                $bill = Tagihan::firstOrCreate([
+                    'siswa_id' => $siswa->id, 'tahun_ajaran_id' => $data['tahun_ajaran_id'],
+                    'bulan' => $this->months()[$cursor->month], 'tahun' => $cursor->year,
+                ], ['nominal' => $fee->nominal, 'jatuh_tempo' => $cursor->copy()->day($this->scheduledDueDay()), 'status' => 'belum_lunas']);
+                if (! in_array($bill->status, ['lunas', 'gratis'], true)) {
+                    Pembayaran::firstOrCreate(['tagihan_id' => $bill->id, 'metode' => 'manual', 'status' => 'success'], [
+                        'siswa_id' => $siswa->id, 'kode_invoice' => 'INV-FUT-'.now()->format('YmdHis').'-'.$bill->id,
+                        'nominal' => $bill->nominal, 'paid_at' => filled($data['paid_at'] ?? null) ? Carbon::parse($data['paid_at']) : now(), 'verified_by' => auth()->id(),
+                    ]);
+                    $bill->update(['status' => 'lunas']); $count++;
+                }
+                $cursor->addMonth();
+            }
+            return $count;
+        });
+
+        $activities->record(auth()->user(), 'payment.future_settled', $siswa, auth()->user()->name." melunasi SPP masa depan {$siswa->nama} ({$siswa->nis}) sampai {$this->months()[$until->month]} {$until->year}; {$created} bulan diproses.", ['months' => $created], route('activities.index'));
+        return back()->with('success', "Pembayaran sampai {$this->months()[$until->month]} {$until->year} berhasil diproses untuk {$created} bulan.");
+    }
+
     public function confirmArrearsThrough(Request $request, Siswa $siswa, Tagihan $tagihan)
     {
         abort_unless($tagihan->siswa_id === $siswa->id, 404);
@@ -555,7 +598,7 @@ class AdminController extends Controller
                 'admin_tu',
                 'Invoice Midtrans baru dibuat',
                 "Invoice tunggakan {$payment->kode_invoice} untuk {$siswa->nama} dibuat.",
-                route('admin.payments'),
+                route('treasury.payments'),
                 'info'
             );
         } catch (\Exception $exception) {
@@ -569,7 +612,7 @@ class AdminController extends Controller
             ]);
         }
 
-        return redirect()->route('admin.arrears.midtrans-pay-page', $payment);
+        return redirect()->route('treasury.arrears.midtrans-pay-page', $payment);
     }
 
     public function payArrearsMidtransPage(Pembayaran $pembayaran)
@@ -582,80 +625,18 @@ class AdminController extends Controller
         return view('admin.midtrans_pay', compact('pembayaran', 'snapToken'));
     }
 
-    public function finishMidtransArrears(Request $request, Pembayaran $pembayaran, WebNotificationService $notifications)
+    public function finishMidtransArrears(Request $request, Pembayaran $pembayaran, MidtransService $midtrans, MidtransPaymentProcessor $processor, WebNotificationService $notifications)
     {
         abort_unless($pembayaran->metode === 'midtrans', 422);
 
-        $data = $request->validate([
-            'transaction_status' => ['nullable', 'string'],
-            'transaction_id' => ['nullable', 'string'],
-        ]);
-
-        $status = $data['transaction_status'] ?? 'settlement';
-
-        if (in_array($status, ['capture', 'settlement'], true)) {
-            $wasPaid = in_array($pembayaran->status, ['settlement', 'success'], true);
-            $pembayaran->update([
-                'status' => $status === 'settlement' ? 'settlement' : 'success',
-                'midtrans_transaction_id' => $data['transaction_id'] ?? $pembayaran->midtrans_transaction_id,
-                'paid_at' => now(),
-            ]);
-            $pembayaran->tagihan()->update(['status' => 'lunas']);
-
-            // Cancel any other pending payments
-            Pembayaran::where('tagihan_id', $pembayaran->tagihan_id)
-                ->where('id', '!=', $pembayaran->id)
-                ->where('status', 'pending')
-                ->update(['status' => 'cancelled']);
-
-            // Split the payment for earlier months
-            Pembayaran::resolveMultiBillPayment($pembayaran);
-
-            $pembayaran->load('siswa.kelas', 'tagihan');
-
-            if (! $wasPaid) {
-                $notifications->toStudent(
-                    $pembayaran->siswa_id,
-                    'Pembayaran online berhasil',
-                    "Pembayaran tunggakan sampai {$pembayaran->tagihan->bulan} {$pembayaran->tagihan->tahun} sudah lunas.",
-                    route('siswa.riwayat'),
-                    'success'
-                );
-
-                $adminMessage = "{$pembayaran->siswa->nama} baru saja membayar tunggakan menggunakan Midtrans. "
-                    ."Kelas {$pembayaran->siswa->kelas->nama_kelas}, tagihan sampai {$pembayaran->tagihan->bulan} {$pembayaran->tagihan->tahun}, "
-                    ."status {$status}"
-                    .($pembayaran->midtrans_transaction_id ? ", trx {$pembayaran->midtrans_transaction_id}" : '').'.';
-                $notifications->toRole(
-                    'admin_tu',
-                    'Pembayaran Midtrans berhasil',
-                    $adminMessage,
-                    route('admin.payments'),
-                    'success'
-                );
-            }
-
-            return response()->json(['ok' => true, 'redirect' => route('admin.arrears.students')]);
+        try {
+            $processor->process($pembayaran, $midtrans->getTransactionStatus($pembayaran), $notifications);
+        } catch (\Throwable $exception) {
+            report($exception);
+            return response()->json(['ok' => false, 'message' => 'Status pembayaran belum dapat diverifikasi. Coba lagi beberapa saat.'], 422);
         }
 
-        if (in_array($status, ['deny', 'cancel', 'expire', 'failure'], true)) {
-            $pembayaran->update(['status' => $status === 'expire' ? 'expired' : 'failed']);
-            $pembayaran->tagihan()->update(['status' => 'gagal']);
-
-            // Revert preceding bills
-            Pembayaran::revertPrecedingBills($pembayaran);
-
-            $pembayaran->load('siswa.kelas', 'tagihan');
-            $notifications->toStudent(
-                $pembayaran->siswa_id,
-                'Pembayaran Midtrans belum berhasil',
-                "Pembayaran {$pembayaran->tagihan->bulan} via Midtrans berstatus {$status}.",
-                route('siswa.tagihan'),
-                'danger'
-            );
-        }
-
-        return response()->json(['ok' => true, 'redirect' => route('admin.arrears.students')]);
+        return response()->json(['ok' => true, 'redirect' => route('treasury.arrears.students')]);
     }
 
     public function reopenArrearsBill(Siswa $siswa, Tagihan $tagihan)
@@ -689,12 +670,13 @@ class AdminController extends Controller
         return view('admin.cash_queue', ['payments' => Pembayaran::with('siswa.kelas', 'tagihan')->where('metode', 'tunai')->where('status', 'pending')->latest()->get()]);
     }
 
-    public function confirmCash(Pembayaran $pembayaran, WebNotificationService $notifications)
+    public function confirmCash(Pembayaran $pembayaran, WebNotificationService $notifications, ActivityLogger $activities)
     {
         abort_unless($pembayaran->metode === 'tunai', 422);
         $pembayaran->update(['status' => 'success', 'paid_at' => now(), 'verified_by' => auth()->id()]);
         $pembayaran->tagihan()->update(['status' => 'lunas']);
         $pembayaran = $pembayaran->fresh()->load('siswa.kelas', 'tagihan');
+        $activities->record(auth()->user(), 'payment.cash_confirmed', $pembayaran, auth()->user()->name." mengonfirmasi pembayaran tunai {$pembayaran->kode_invoice} milik {$pembayaran->siswa->nama} ({$pembayaran->siswa->nis}) pada ".now()->timezone(config('app.timezone'))->format('d/m/Y H:i').' WIB.', [], route('activities.index'));
         $notifications->toStudent(
             $pembayaran->siswa_id,
             'Pembayaran tunai dikonfirmasi',
@@ -783,7 +765,7 @@ class AdminController extends Controller
         ]);
     }
 
-    public function manualPayment(Request $request, WebNotificationService $notifications)
+    public function manualPayment(Request $request, WebNotificationService $notifications, ActivityLogger $activities)
     {
         app(MidtransPendingPaymentCleaner::class)->deleteExpired();
 
@@ -812,6 +794,7 @@ class AdminController extends Controller
         ]);
         $tagihan->update(['status' => 'lunas']);
         $payment->load('siswa.kelas', 'tagihan');
+        $activities->record(auth()->user(), 'payment.manual_recorded', $payment, "{$auth()->user()->name} mencatat pembayaran manual {$payment->kode_invoice} milik {$payment->siswa->nama} ({$payment->siswa->nis}) pada ".now()->timezone(config('app.timezone'))->format('d/m/Y H:i').' WIB.', [], route('activities.index'));
         $notifications->toStudent(
             $payment->siswa_id,
             'Pembayaran manual dicatat',
@@ -831,8 +814,9 @@ class AdminController extends Controller
         return back()->with('success', 'Pembayaran manual tersimpan.');
     }
 
-    public function cancelPayment(Pembayaran $pembayaran, WebNotificationService $notifications)
+    public function cancelPayment(Request $request, Pembayaran $pembayaran, WebNotificationService $notifications, ActivityLogger $activities)
     {
+        $data = $request->validate(['reason' => ['required', 'string', 'max:1000']]);
         if ($pembayaran->metode !== 'manual' || $pembayaran->status !== 'success') {
             return back()->withErrors(['pembayaran' => 'Hanya pembayaran manual yang sudah sukses yang bisa dibatalkan dari halaman ini.']);
         }
@@ -848,6 +832,7 @@ class AdminController extends Controller
             $pembayaran->tagihan()->update(['status' => 'belum_lunas']);
         }
         $pembayaran->load('siswa.kelas', 'tagihan');
+        $activities->record(auth()->user(), 'payment.cancelled', $pembayaran, "{$auth()->user()->name} membatalkan transaksi {$pembayaran->kode_invoice} milik {$pembayaran->siswa->nama} ({$pembayaran->siswa->nis}) pada ".now()->timezone(config('app.timezone'))->format('d/m/Y H:i').' WIB. Alasan: '.$data['reason'], ['reason' => $data['reason']], route('activities.index'));
         $notifications->toStudent(
             $pembayaran->siswa_id,
             'Transaksi manual dibatalkan',
@@ -1006,7 +991,12 @@ class AdminController extends Controller
         ];
         $reportRows = $this->monthlyReportRows($tagihan);
 
-        $pdf = Pdf::loadView('reports.pdf', compact('tagihan', 'reportRows', 'summary', 'filters'))->setPaper('a4', 'landscape');
+        $signer = User::where('role', 'kepala_sekolah')->where('is_report_signer', true)->first();
+        if (! $signer) {
+            return back()->withErrors(['laporan' => 'PDF belum dapat dibuat karena Kepala Sekolah penanda tangan belum ditetapkan.']);
+        }
+
+        $pdf = Pdf::loadView('reports.pdf', compact('tagihan', 'reportRows', 'summary', 'filters', 'signer'))->setPaper('a4', 'landscape');
         return $pdf->download('laporan-spp.pdf');
     }
 
@@ -1156,7 +1146,8 @@ class AdminController extends Controller
         $data = $request->validate([
             'name' => ['required'], 'username' => ['required', 'unique:users,username'],
             'password' => ['required', 'min:6'],
-            'role' => ['required', 'in:siswa,admin_tu,kepala_sekolah,wali_kelas'],
+            'role' => ['required', 'in:siswa,admin_tu,bendahara,kepala_sekolah,wali_kelas'],
+            'email' => ['nullable', 'email', 'unique:users,email'], 'nip' => ['nullable', 'max:50'], 'is_report_signer' => ['nullable'],
             'siswa_id' => ['nullable', 'exists:siswa,id'],
             'kelas_id' => ['nullable', 'required_if:role,wali_kelas', 'exists:kelas,id'],
         ]);
@@ -1167,6 +1158,9 @@ class AdminController extends Controller
             $data['kelas_id'] = null;
         }
         $data['password'] = Hash::make($data['password']);
+        if ($data['role'] !== 'kepala_sekolah') $data['is_report_signer'] = false;
+        if ($request->boolean('is_report_signer')) User::where('role', 'kepala_sekolah')->update(['is_report_signer' => false]);
+        $data['is_report_signer'] = $request->boolean('is_report_signer');
         User::create($data);
         return back()->with('success', 'User tersimpan.');
     }
@@ -1176,7 +1170,8 @@ class AdminController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'username' => ['required', 'string', 'max:255', Rule::unique('users', 'username')->ignore($user->id)],
-            'role' => ['required', 'in:siswa,admin_tu,kepala_sekolah,wali_kelas'],
+            'role' => ['required', 'in:siswa,admin_tu,bendahara,kepala_sekolah,wali_kelas'],
+            'email' => ['nullable', 'email', Rule::unique('users', 'email')->ignore($user->id)], 'nip' => ['nullable', 'max:50'], 'is_report_signer' => ['nullable'],
             'siswa_id' => ['nullable', 'exists:siswa,id'],
             'kelas_id' => ['nullable', 'required_if:role,wali_kelas', 'exists:kelas,id'],
         ]);
@@ -1188,6 +1183,9 @@ class AdminController extends Controller
             $data['kelas_id'] = null;
         }
 
+        if ($data['role'] !== 'kepala_sekolah') $data['is_report_signer'] = false;
+        if ($request->boolean('is_report_signer')) User::where('role', 'kepala_sekolah')->whereKeyNot($user->id)->update(['is_report_signer' => false]);
+        $data['is_report_signer'] = $request->boolean('is_report_signer');
         $user->update($data);
 
         return back()->with('success', 'Data login user diperbarui.');

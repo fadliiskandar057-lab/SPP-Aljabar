@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $title ?? 'SPP Al Jabbar' }}</title>
+    <link rel="manifest" href="{{ asset('manifest.webmanifest') }}">
     <link rel="icon" type="image/svg+xml" href="{{ asset('images/logo-sekolah.svg') }}">
     <link rel="shortcut icon" type="image/svg+xml" href="{{ asset('images/logo-sekolah.svg') }}">
     <link rel="apple-touch-icon" href="{{ asset('images/logo-sekolah.svg') }}">
@@ -92,8 +93,42 @@
         .profile-summary { padding:.85rem 1rem; background:#f8fafc; border-bottom:1px solid var(--line); }
         .profile-summary strong { display:block; color:#102027; }
         .profile-summary span { display:block; color:var(--muted); font-size:.78rem; text-transform:capitalize; }
-        .modal { z-index:1085; }
+        /* Keep every dialog usable on short laptop screens. The body is the
+           only scrollable region, so headers and action buttons stay visible. */
+        .modal { z-index:1085; padding:.5rem; overflow-y:auto; }
         .modal-backdrop { z-index:1080; }
+        .modal-dialog {
+            margin:.5rem auto;
+            max-height:calc(100vh - 1rem);
+            max-height:calc(100dvh - 1rem);
+        }
+        .modal-dialog-centered {
+            min-height:calc(100vh - 1rem);
+            min-height:calc(100dvh - 1rem);
+        }
+        .modal-dialog-scrollable {
+            height:calc(100vh - 1rem);
+            height:calc(100dvh - 1rem);
+        }
+        .modal-dialog .modal-content {
+            max-height:calc(100vh - 1rem);
+            max-height:calc(100dvh - 1rem);
+            overflow:hidden;
+        }
+        .modal-dialog .modal-content > form {
+            display:flex;
+            flex:1 1 auto;
+            flex-direction:column;
+            min-height:0;
+            overflow:hidden;
+        }
+        .modal-dialog .modal-header,
+        .modal-dialog .modal-footer { flex:0 0 auto; }
+        .modal-dialog .modal-body {
+            min-height:0;
+            overflow-y:auto;
+            overscroll-behavior:contain;
+        }
         @keyframes dateFloat {
             0%,100% { transform:translateY(0) rotateX(0deg) rotateY(0deg); }
             50% { transform:translateY(-3px) rotateX(8deg) rotateY(-10deg); }
@@ -591,15 +626,18 @@
                             <a class="{{ request()->routeIs('siswa.riwayat') ? 'active' : '' }}" href="{{ route('siswa.riwayat') }}"><i class="bi bi-clock-history"></i>Riwayat Pembayaran</a>
                             <a class="{{ request()->routeIs('siswa.profil') ? 'active' : '' }}" href="{{ route('siswa.profil') }}"><i class="bi bi-person"></i>Profil</a>
                         @elseif(auth()->user()->role === 'admin_tu')
-                            <div class="nav-section-label">Administrasi</div>
+                            <div class="nav-section-label">Admin Manajemen</div>
                             <a class="{{ request()->routeIs('admin.siswa*') ? 'active' : '' }}" href="{{ route('admin.siswa') }}"><i class="bi bi-people"></i>Data Siswa</a>
                             <a class="{{ request()->routeIs('admin.settings','admin.kelas*','admin.tahun*','admin.biaya*') ? 'active' : '' }}" href="{{ route('admin.settings') }}"><i class="bi bi-sliders"></i>Pengaturan SPP</a>
-                            <a class="{{ request()->routeIs('admin.arrears.*') ? 'active' : '' }}" href="{{ route('admin.arrears.students') }}"><i class="bi bi-calendar2-check"></i>Tunggakan Siswa</a>
-                            <a class="{{ request()->routeIs('admin.cash.*') ? 'active' : '' }}" href="{{ route('admin.cash.queue') }}"><i class="bi bi-wallet2"></i>Antrian Tunai</a>
-                            <a class="{{ request()->routeIs('admin.payments*') ? 'active' : '' }}" href="{{ route('admin.payments') }}"><i class="bi bi-credit-card"></i>Transaksi Pembayaran</a>
-                            <a class="{{ request()->routeIs('admin.sequential') ? 'active' : '' }}" href="{{ route('admin.sequential') }}"><i class="bi bi-search"></i>Pencarian Sequential</a>
-                            <a class="{{ request()->routeIs('admin.laporan*') ? 'active' : '' }}" href="{{ route('admin.laporan') }}"><i class="bi bi-file-earmark-bar-graph"></i>Laporan Bulanan</a>
                             <a class="{{ request()->routeIs('admin.users*') ? 'active' : '' }}" href="{{ route('admin.users') }}"><i class="bi bi-person-gear"></i>User Management</a>
+                            <a class="{{ request()->routeIs('activities.*') ? 'active' : '' }}" href="{{ route('activities.index') }}"><i class="bi bi-clock-history"></i>Aktivitas Manajemen</a>
+                        @elseif(auth()->user()->role === 'bendahara')
+                            <div class="nav-section-label">Bendahara</div>
+                            <a class="{{ request()->routeIs('treasury.arrears.*') ? 'active' : '' }}" href="{{ route('treasury.arrears.students') }}"><i class="bi bi-calendar2-check"></i>Tunggakan Siswa</a>
+                            <a class="{{ request()->routeIs('treasury.cash.*') ? 'active' : '' }}" href="{{ route('treasury.cash.queue') }}"><i class="bi bi-wallet2"></i>Antrian Tunai</a>
+                            <a class="{{ request()->routeIs('treasury.payments*') ? 'active' : '' }}" href="{{ route('treasury.payments') }}"><i class="bi bi-credit-card"></i>Transaksi Pembayaran</a>
+                            <a class="{{ request()->routeIs('treasury.laporan*') ? 'active' : '' }}" href="{{ route('treasury.laporan') }}"><i class="bi bi-file-earmark-bar-graph"></i>Laporan Bulanan</a>
+                            <a class="{{ request()->routeIs('activities.*') ? 'active' : '' }}" href="{{ route('activities.index') }}"><i class="bi bi-clock-history"></i>Aktivitas Manajemen</a>
                         @elseif(auth()->user()->role === 'wali_kelas')
                             <div class="nav-section-label">Wali Kelas</div>
                             <a class="{{ request()->routeIs('wali.students') ? 'active' : '' }}" href="{{ route('wali.students') }}"><i class="bi bi-people"></i>Siswa Kelas</a>
@@ -677,6 +715,7 @@
                                     <strong>{{ auth()->user()->name }}</strong>
                                     <span>{{ str_replace('_',' ',auth()->user()->role) }}</span>
                                 </div>
+                                <a class="dropdown-item py-2" href="{{ route('profile.edit') }}"><i class="bi bi-person-gear me-2"></i>Profil Akun</a>
                                 <form method="post" action="{{ route('logout') }}">
                                     @csrf
                                     <button class="dropdown-item text-danger py-2" type="submit">
@@ -980,6 +1019,7 @@ if (canvas) {
     requestAnimationFrame(animateThree);
 }
 </script>
+<script>if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('{{ asset('service-worker.js') }}'));</script>
 @stack('scripts')
 </body>
 </html>

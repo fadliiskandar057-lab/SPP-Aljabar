@@ -6,3 +6,7 @@
 /storage/*.key
 /whatsapp-gateway/node_modules
 /whatsapp-gateway/auth
+/.phpunit.result.cache
+/New folder/
+/public/payment-proofs/*
+*.zip

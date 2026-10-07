@@ -47,10 +47,10 @@ class GenerateMonthlyBillsCommand extends Command
         $this->info("Generate selesai. {$stats['created']} tagihan baru dibuat, {$stats['free']} gratis, {$stats['discounted']} diskon, {$stats['skipped_existing']} sudah ada, {$stats['skipped_no_fee']} dilewati karena biaya belum diatur.");
         if ($stats['created'] > 0) {
             $notifications->toRole(
-                'admin_tu',
+                'bendahara',
                 'Tagihan bulanan otomatis dibuat',
                 "{$stats['created']} tagihan baru dibuat untuk {$this->months()[$today->month]} {$today->year}.",
-                route('admin.laporan', ['bulan' => $this->months()[$today->month]]),
+                route('treasury.laporan', ['bulan' => $this->months()[$today->month]]),
                 'success',
             );
         }

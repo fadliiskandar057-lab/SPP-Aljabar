@@ -14,13 +14,18 @@
 <div class="role-page">
     <section class="role-hero">
         <div class="role-hero-copy">
-            <span class="role-kicker"><i class="bi bi-speedometer2"></i>Operasional Admin TU</span>
+            <span class="role-kicker"><i class="bi bi-speedometer2"></i>{{ auth()->user()->role === 'bendahara' ? 'Operasional Bendahara' : 'Administrasi Manajemen' }}</span>
             <h3>Dashboard Pembayaran SPP</h3>
-            <p>Ringkasan pemasukan, status pembayaran siswa, dan transaksi terbaru dalam satu tampilan kerja.</p>
+            <p>{{ auth()->user()->role === 'bendahara' ? 'Ringkasan pemasukan, status pembayaran siswa, dan transaksi terbaru.' : 'Ringkasan data aplikasi dan status pembayaran untuk pemantauan manajemen.' }}</p>
         </div>
         <div class="role-hero-actions">
-            <a href="{{ route('admin.laporan') }}" class="btn btn-primary"><i class="bi bi-file-earmark-bar-graph"></i>Laporan Bulanan</a>
-            <a href="{{ route('admin.payments') }}" class="btn btn-outline-primary"><i class="bi bi-credit-card"></i>Transaksi</a>
+            @if(auth()->user()->role === 'bendahara')
+                <a href="{{ route('treasury.laporan') }}" class="btn btn-primary"><i class="bi bi-file-earmark-bar-graph"></i>Laporan Bulanan</a>
+                <a href="{{ route('treasury.payments') }}" class="btn btn-outline-primary"><i class="bi bi-credit-card"></i>Transaksi</a>
+            @else
+                <a href="{{ route('admin.settings') }}" class="btn btn-primary"><i class="bi bi-sliders"></i>Pengaturan SPP</a>
+                <a href="{{ route('admin.users') }}" class="btn btn-outline-primary"><i class="bi bi-person-gear"></i>User Management</a>
+            @endif
         </div>
     </section>
 

@@ -7,17 +7,18 @@ title Installer SPP Al Jabbar
 :menu
 cls
 echo ============================================================
-echo                 SPP AL JABBAR - INSTALLER
+echo             SPP AL JABBAR - INSTALLER LOKAL
 echo ============================================================
 echo.
 echo Folder project:
 echo %cd%
+echo Pastikan MySQL/MariaDB lokal sudah dijalankan dari Laragon atau XAMPP.
 echo.
 echo Pilih tindakan:
 echo.
 echo   1. Install / Update aman + jalankan server
 echo      - Tidak menghapus database lama
-echo      - Cocok untuk revisi/update client
+echo      - Cocok untuk revisi atau pembaruan aplikasi
 echo.
 echo   2. Install / Update aman saja, tanpa jalankan server
 echo      - Tidak menghapus database lama
@@ -65,7 +66,7 @@ echo                  PERINGATAN RESET DATABASE
 echo ============================================================
 echo.
 echo Mode ini akan menghapus semua tabel dan data lama.
-echo Jangan gunakan pilihan ini jika database client sudah berisi data.
+echo Jangan gunakan pilihan ini jika database sudah berisi data penting.
 echo.
 set /p confirm="Ketik RESET untuk lanjut: "
 if /i not "%confirm%"=="RESET" (

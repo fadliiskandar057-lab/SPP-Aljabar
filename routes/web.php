@@ -8,6 +8,8 @@ use App\Http\Controllers\MidtransWebhookController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\SiswaPortalController;
 use App\Http\Controllers\WaliKelasController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\PushSubscriptionController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => auth()->check() ? redirect()->route('dashboard') : view('landing'))->name('landing');
@@ -15,14 +17,23 @@ Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.post');
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->name('logout');
 Route::post('/midtrans/webhook', MidtransWebhookController::class)->name('midtrans.webhook');
+Route::get('/lupa-password', [AuthController::class, 'forgotPassword'])->middleware('guest')->name('password.request');
+Route::post('/lupa-password', [AuthController::class, 'sendResetLink'])->middleware('guest')->name('password.email');
+Route::get('/reset-password/{token}', [AuthController::class, 'resetPasswordForm'])->middleware('guest')->name('password.reset');
+Route::post('/reset-password', [AuthController::class, 'resetPassword'])->middleware('guest')->name('password.update');
 
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+    Route::get('/profil-akun', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::put('/profil-akun', [ProfileController::class, 'update'])->name('profile.update');
+    Route::put('/profil-akun/password', [ProfileController::class, 'password'])->name('profile.password');
+    Route::post('/push-subscriptions', [PushSubscriptionController::class, 'store'])->name('push-subscriptions.store');
     Route::get('/notifikasi', [NotificationController::class, 'index'])->name('notifications.index');
     Route::post('/notifikasi/baca-semua', [NotificationController::class, 'readAll'])->name('notifications.read-all');
     Route::post('/notifikasi/{notification}/baca', [NotificationController::class, 'read'])->name('notifications.read');
     Route::get('/invoice/{pembayaran}', [InvoiceController::class, 'show'])->name('invoice.show');
     Route::get('/invoice/{pembayaran}/download', [InvoiceController::class, 'download'])->name('invoice.download');
+    Route::middleware('role:admin_tu,bendahara,kepala_sekolah')->get('/aktivitas', [\App\Http\Controllers\ActivityLogController::class, 'index'])->name('activities.index');
 
     Route::middleware('role:siswa')->prefix('siswa')->name('siswa.')->group(function () {
         Route::get('/tagihan', [SiswaPortalController::class, 'bills'])->name('tagihan');
@@ -58,8 +69,17 @@ Route::middleware('auth')->group(function () {
         Route::post('/jadwal-tagihan-otomatis', [AdminController::class, 'updateAutoBillSetting'])->name('auto-bill.update');
         Route::post('/gratis-diskon-tagihan', [AdminController::class, 'storeTagihanExemption'])->name('exemptions.store');
         Route::delete('/gratis-diskon-tagihan/{tagihanExemption}', [AdminController::class, 'destroyTagihanExemption'])->name('exemptions.destroy');
+        Route::get('/users', [AdminController::class, 'users'])->name('users');
+        Route::post('/users', [AdminController::class, 'storeUser'])->name('users.store');
+        Route::put('/users/{user}', [AdminController::class, 'updateUser'])->name('users.update');
+        Route::patch('/users/{user}/password', [AdminController::class, 'changeUserPassword'])->name('users.password');
+        Route::patch('/users/{user}/reset-password', [AdminController::class, 'resetUserPassword'])->name('users.reset-password');
+    });
+
+    Route::middleware('role:bendahara')->prefix('bendahara')->name('treasury.')->group(function () {
         Route::get('/tunggakan-siswa', [AdminController::class, 'studentArrears'])->name('arrears.students');
         Route::post('/tunggakan-siswa/set-terakhir-bayar', [AdminController::class, 'setLastPaidSiswa'])->name('arrears.set-last-paid');
+        Route::post('/tunggakan-siswa/bayar-masa-depan', [AdminController::class, 'settleFuturePayments'])->name('arrears.future-payment');
         Route::post('/tunggakan-siswa/{siswa}/konfirmasi/{tagihan}', [AdminController::class, 'confirmArrearsThrough'])->name('arrears.confirm-through');
         Route::post('/tunggakan-siswa/{siswa}/midtrans/{tagihan}', [AdminController::class, 'confirmArrearsMidtrans'])->name('arrears.midtrans');
         Route::get('/tunggakan-siswa/midtrans/{pembayaran}/bayar', [AdminController::class, 'payArrearsMidtransPage'])->name('arrears.midtrans-pay-page');
@@ -71,16 +91,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/transaksi/search', [AdminController::class, 'searchPayments'])->name('payments.search');
         Route::post('/transaksi/manual', [AdminController::class, 'manualPayment'])->name('payments.manual');
         Route::post('/transaksi/{pembayaran}/batalkan', [AdminController::class, 'cancelPayment'])->name('payments.cancel');
-        Route::get('/pencarian-sequential', [AdminController::class, 'sequential'])->name('sequential');
-        Route::get('/pencarian-sequential/siswa-search', [AdminController::class, 'searchSequentialSiswa'])->name('sequential.siswa.search');
         Route::get('/laporan', [AdminController::class, 'laporan'])->name('laporan');
         Route::get('/laporan/pdf', [AdminController::class, 'laporanPdf'])->name('laporan.pdf');
         Route::get('/laporan/excel', [AdminController::class, 'laporanExcel'])->name('laporan.excel');
-        Route::get('/users', [AdminController::class, 'users'])->name('users');
-        Route::post('/users', [AdminController::class, 'storeUser'])->name('users.store');
-        Route::put('/users/{user}', [AdminController::class, 'updateUser'])->name('users.update');
-        Route::patch('/users/{user}/password', [AdminController::class, 'changeUserPassword'])->name('users.password');
-        Route::patch('/users/{user}/reset-password', [AdminController::class, 'resetUserPassword'])->name('users.reset-password');
     });
 
     Route::middleware('role:wali_kelas')->prefix('wali-kelas')->name('wali.')->group(function () {

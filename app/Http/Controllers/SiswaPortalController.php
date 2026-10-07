@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Pembayaran;
 use App\Models\Tagihan;
 use App\Services\MidtransPendingPaymentCleaner;
+use App\Services\MidtransPaymentProcessor;
 use App\Services\MidtransService;
 use App\Services\WebNotificationService;
 use Exception;
@@ -92,10 +93,10 @@ class SiswaPortalController extends Controller
 
         $payment->load('siswa.kelas', 'tagihan');
         $notifications->toRole(
-            'admin_tu',
+            'bendahara',
             'Invoice tunai baru',
             "{$payment->siswa->nama} membuat invoice tunai {$payment->kode_invoice}.",
-            route('admin.cash.queue'),
+            route('treasury.cash.queue'),
             'warning',
         );
         if ($payment->siswa->kelas_id) {
@@ -157,92 +158,17 @@ class SiswaPortalController extends Controller
         return view('siswa.midtrans', compact('payment', 'snapToken'));
     }
 
-    public function finishMidtrans(Request $request, Pembayaran $pembayaran, WebNotificationService $notifications)
+    public function finishMidtrans(Request $request, Pembayaran $pembayaran, MidtransService $midtrans, MidtransPaymentProcessor $processor, WebNotificationService $notifications)
     {
         abort_unless($pembayaran->siswa_id === auth()->user()->siswa_id, 403);
         abort_unless($pembayaran->metode === 'midtrans', 422);
 
-        $data = $request->validate([
-            'transaction_status' => ['nullable', 'string'],
-            'transaction_id' => ['nullable', 'string'],
-        ]);
-
-        $status = $data['transaction_status'] ?? 'settlement';
-
-        if (in_array($status, ['capture', 'settlement'], true)) {
-            $wasPaid = in_array($pembayaran->status, ['settlement', 'success'], true);
-            $pembayaran->update([
-                'status' => $status === 'settlement' ? 'settlement' : 'success',
-                'midtrans_transaction_id' => $data['transaction_id'] ?? $pembayaran->midtrans_transaction_id,
-                'paid_at' => now(),
-            ]);
-            $pembayaran->tagihan()->update(['status' => 'lunas']);
-            Pembayaran::where('tagihan_id', $pembayaran->tagihan_id)
-                ->where('id', '!=', $pembayaran->id)
-                ->where('status', 'pending')
-                ->update(['status' => 'cancelled']);
-            Pembayaran::resolveMultiBillPayment($pembayaran);
-            $pembayaran->load('siswa.kelas', 'tagihan');
-            if (! $wasPaid) {
-                $notifications->toUser(
-                    auth()->user(),
-                    'Pembayaran online berhasil',
-                    "Pembayaran {$pembayaran->tagihan->bulan} sudah tercatat lunas.",
-                    route('siswa.riwayat'),
-                    'success',
-                );
-                $adminMessage = "{$pembayaran->siswa->nama} baru saja membayar menggunakan Midtrans. "
-                    ."Kelas {$pembayaran->siswa->kelas->nama_kelas}, tagihan {$pembayaran->tagihan->bulan} {$pembayaran->tagihan->tahun}, "
-                    .'nominal Rp '.number_format($pembayaran->nominal, 0, ',', '.')
-                    .", invoice {$pembayaran->kode_invoice}, status {$status}"
-                    .($pembayaran->midtrans_transaction_id ? ", trx {$pembayaran->midtrans_transaction_id}" : '').'.';
-                $notifications->toRole(
-                    'admin_tu',
-                    'Pembayaran Midtrans berhasil',
-                    $adminMessage,
-                    route('admin.payments'),
-                    'success',
-                );
-                if ($pembayaran->siswa->kelas_id) {
-                    $notifications->toClassGuardians(
-                        $pembayaran->siswa->kelas_id,
-                        'Pembayaran Midtrans siswa berhasil',
-                        "{$pembayaran->siswa->nama} membayar {$pembayaran->tagihan->bulan} via Midtrans sebesar Rp ".number_format($pembayaran->nominal, 0, ',', '.').'.',
-                        route('wali.payments'),
-                        'success',
-                    );
-                }
-            }
-
-            return response()->json(['ok' => true, 'redirect' => route('siswa.riwayat')]);
-        }
-
-        if (in_array($status, ['deny', 'cancel', 'expire', 'failure'], true)) {
-            $pembayaran->update(['status' => $status === 'expire' ? 'expired' : 'failed']);
-            $pembayaran->tagihan()->update(['status' => 'gagal']);
-            Pembayaran::revertPrecedingBills($pembayaran);
-            $pembayaran->load('siswa.kelas', 'tagihan');
-            $notifications->toUser(
-                auth()->user(),
-                'Pembayaran Midtrans belum berhasil',
-                "Pembayaran {$pembayaran->tagihan->bulan} via Midtrans berstatus {$status}. Silakan coba lagi.",
-                route('siswa.tagihan'),
-                'danger',
-            );
-            $adminMessage = "Transaksi Midtrans {$pembayaran->siswa->nama} gagal/berakhir. "
-                ."Kelas {$pembayaran->siswa->kelas->nama_kelas}, tagihan {$pembayaran->tagihan->bulan} {$pembayaran->tagihan->tahun}, "
-                .'nominal Rp '.number_format($pembayaran->nominal, 0, ',', '.')
-                .", invoice {$pembayaran->kode_invoice}, status {$status}.";
-            $notifications->toRole('admin_tu', 'Pembayaran Midtrans gagal', $adminMessage, route('admin.payments'), 'danger');
-            if ($pembayaran->siswa->kelas_id) {
-                $notifications->toClassGuardians(
-                    $pembayaran->siswa->kelas_id,
-                    'Pembayaran Midtrans siswa gagal',
-                    "{$pembayaran->siswa->nama} ({$pembayaran->siswa->kelas->nama_kelas}) belum berhasil membayar {$pembayaran->tagihan->bulan} {$pembayaran->tagihan->tahun} via Midtrans. Nominal Rp ".number_format($pembayaran->nominal, 0, ',', '.').", invoice {$pembayaran->kode_invoice}, status {$status}.",
-                    route('wali.arrears'),
-                    'danger',
-                );
-            }
+        try {
+            // Never trust browser callback fields as proof of payment.
+            $processor->process($pembayaran, $midtrans->getTransactionStatus($pembayaran), $notifications);
+        } catch (\Throwable $exception) {
+            report($exception);
+            return response()->json(['ok' => false, 'message' => 'Status pembayaran belum dapat diverifikasi. Coba buka riwayat beberapa saat lagi.'], 422);
         }
 
         return response()->json(['ok' => true, 'redirect' => route('siswa.riwayat')]);

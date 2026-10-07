@@ -390,9 +390,10 @@
                     Laporan ini dibuat otomatis oleh sistem pembayaran SPP. Gunakan dokumen ini sebagai arsip monitoring penerimaan dan tunggakan.
                 </td>
                 <td class="signature">
-                    Admin TU,
+                    Mengetahui,<br>Kepala Sekolah,
                     <div class="signature-space"></div>
-                    <span class="signature-name">Admin TU Digital</span>
+                    <span class="signature-name">{{ $signer->name }}</span>
+                    <br><small>NIP. {{ $signer->nip }}</small>
                 </td>
             </tr>
         </table>
