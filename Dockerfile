@@ -12,7 +12,8 @@ COPY . .
 COPY docker/apache-vhost.conf /etc/apache2/sites-available/000-default.conf
 RUN composer dump-autoload --no-dev --optimize
 COPY docker/start-container.sh /usr/local/bin/start-container
-RUN chmod +x /usr/local/bin/start-container \
+RUN mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
+    && chmod +x /usr/local/bin/start-container \
     && chown -R www-data:www-data storage bootstrap/cache
 EXPOSE 10000
 CMD ["/usr/local/bin/start-container"]
