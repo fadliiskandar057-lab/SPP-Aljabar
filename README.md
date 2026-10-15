@@ -263,8 +263,9 @@ Manual mencatat pembayaran per tagihan. Midtrans kumulatif memakai transaksi gab
 1. Buka **Tunggakan Siswa > Bayar Masa Depan**.
 2. Pilih siswa aktif, tahun ajaran, bulan/tahun tujuan: bulan ini atau sesudahnya.
 3. Klik **Proses Pelunasan**.
-4. Sistem menyiapkan tagihan dari bulan berjalan sampai tujuan yang belum ada, lalu membuka **Metode Pembayaran**.
-5. Periksa rincian/total, pilih **Konfirmasi Bayar Tunai** atau **Bayar melalui Midtrans**.
+4. Setelah siswa dipilih, modal menampilkan batas lunas, tagihan belum lunas beserta totalnya, dan bulan awal pembayaran. Bulan awal mengikuti bulan setelah pelunasan berurutan; jika ada tunggakan atau celah data, proses dimulai dari bulan tersebut. Tanpa riwayat, awal memakai bulan berjalan.
+5. Sistem menyiapkan bulan yang belum tercatat sampai tujuan, melewati bulan yang sudah tercatat meskipun tahun ajarannya berbeda, lalu membuka **Metode Pembayaran**.
+6. Periksa rincian/total, pilih **Konfirmasi Bayar Tunai** atau **Bayar melalui Midtrans**.
 
 **Proses Pelunasan belum menandai tagihan lunas.** Pelunasan baru melalui konfirmasi tunai atau hasil Midtrans terverifikasi. Tunggakan sebelumnya ikut dalam total. Jika kembali sebelum memilih metode, tagihan yang disiapkan tetap tersimpan. Jika semua tagihan sampai tujuan sudah lunas/gratis, muncul pesan tidak ada tagihan yang perlu dibayar.
 

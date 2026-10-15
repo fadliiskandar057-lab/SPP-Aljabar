@@ -41,6 +41,17 @@ class FuturePaymentTest extends TestCase
 
         $data['until_month'] = 9;
         $this->post(route('treasury.arrears.future-payment'), $data)->assertSessionHasErrors('until_month');
+
+        $student->tagihan()->update(['status' => 'lunas']);
+        $nextYear = TahunAjaran::create(['nama' => '2027/2028', 'is_active' => false]);
+        $data = ['siswa_id' => $student->id, 'tahun_ajaran_id' => $nextYear->id, 'until_month' => 1, 'until_year' => 2027];
+        $this->post(route('treasury.arrears.future-payment'), $data)->assertOk()->assertSee('100.000');
+        $this->assertDatabaseCount('tagihan', 4);
+        $this->assertDatabaseHas('tagihan', ['siswa_id' => $student->id, 'bulan' => 'Januari', 'tahun' => 2027, 'status' => 'belum_lunas']);
+        $this->assertDatabaseCount('pembayaran', 0);
+
+        $this->get(route('treasury.arrears.students'))->assertOk()
+            ->assertSee('futureStudentSummary')->assertSee('futureUnpaidList')->assertSee('futurePaymentRange');
         $this->travelBack();
     }
 }

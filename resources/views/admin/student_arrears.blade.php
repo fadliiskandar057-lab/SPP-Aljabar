@@ -10,11 +10,131 @@
     <div class="d-flex gap-2"><button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#futurePaymentModal"><i class="bi bi-calendar-check"></i> Bayar Masa Depan</button><button class="btn btn-primary arrears-primary-action" type="button" data-bs-toggle="modal" data-bs-target="#setLastPaidModal"><i class="bi bi-calendar-plus"></i> Set Terakhir Bayar</button></div>
 </div>
 
-<div class="modal fade" id="futurePaymentModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="post" action="{{ route('treasury.arrears.future-payment') }}">@csrf
-    <div class="modal-header"><h5 class="modal-title">Bayar SPP Sampai Periode Mendatang</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-    <div class="modal-body row g-3"><div class="col-12"><label class="form-label">Siswa</label><select name="siswa_id" class="form-select" required><option value="">Pilih siswa</option>@foreach($siswaOptions as $item)<option value="{{ $item->id }}">{{ $item->nis }} - {{ $item->nama }}</option>@endforeach</select></div><div class="col-12"><label class="form-label">Tahun ajaran</label><select name="tahun_ajaran_id" class="form-select" required>@foreach($tahun as $t)<option value="{{ $t->id }}" @selected($activeYear?->id === $t->id)>{{ $t->nama }}</option>@endforeach</select></div><div class="col-6"><label class="form-label">Sampai bulan</label><select name="until_month" class="form-select">@foreach($months as $number => $name)<option value="{{ $number }}" @selected(now()->month === $number)>{{ $name }}</option>@endforeach</select></div><div class="col-6"><label class="form-label">Tahun</label><input name="until_year" type="number" min="2020" max="2100" value="{{ now()->year }}" class="form-control" required></div></div>
-    <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button><button class="btn btn-success">Proses Pelunasan</button></div>
-</form></div></div></div>
+<div class="modal fade" id="futurePaymentModal" tabindex="-1" aria-labelledby="futurePaymentLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content">
+        <form method="post" action="{{ route('treasury.arrears.future-payment') }}">
+            @csrf
+            <div class="modal-header">
+                <h5 class="modal-title" id="futurePaymentLabel">Bayar SPP Sampai Periode Mendatang</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label for="futureStudent" class="form-label">Siswa</label>
+                        <select id="futureStudent" name="siswa_id" class="form-select" required>
+                            <option value="">Pilih siswa</option>
+                            @foreach($siswaOptions as $item)
+                                <option value="{{ $item->id }}">{{ $item->nis }} - {{ $item->nama }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-12" aria-live="polite" aria-atomic="true">
+                        <div class="alert alert-info mb-0" id="futureStudentSummary">Pilih siswa untuk melihat batas pelunasan, tunggakan, dan bulan awal pembayaran.</div>
+                        <div id="futureUnpaid" class="mt-2" hidden>
+                            <strong class="small">Tagihan belum lunas yang tercatat</strong>
+                            <ul id="futureUnpaidList" class="small mb-1" style="max-height:180px;overflow-y:auto"></ul>
+                            <div id="futureUnpaidTotal" class="small"></div>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <label for="futureAcademicYear" class="form-label">Tahun ajaran untuk tagihan baru</label>
+                        <select id="futureAcademicYear" name="tahun_ajaran_id" class="form-select" required>
+                            @foreach($tahun as $t)
+                                <option value="{{ $t->id }}" @selected($activeYear?->id === $t->id)>{{ $t->nama }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label for="futureUntilMonth" class="form-label">Bayar sampai bulan</label>
+                        <select id="futureUntilMonth" name="until_month" class="form-select" required>
+                            @foreach($months as $number => $name)
+                                <option value="{{ $number }}" @selected(now()->month === $number)>{{ $name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label for="futureUntilYear" class="form-label">Tahun tujuan</label>
+                        <input id="futureUntilYear" name="until_year" type="number" min="2020" max="2100" value="{{ now()->year }}" class="form-control" required>
+                    </div>
+                    <div class="col-12">
+                        <p id="futurePaymentRange" class="fw-semibold mb-1"></p>
+                        <p class="small text-muted mb-0">Bulan lunas atau gratis tidak ditagih ulang. Tunggakan sampai periode tujuan ikut dibayar. Rincian nominal ditampilkan sebelum memilih Tunai atau Midtrans.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                <button id="futurePaymentSubmit" class="btn btn-success" disabled>Proses Pelunasan</button>
+            </div>
+        </form>
+    </div></div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const students = {{ Illuminate\Support\Js::from($futurePaymentStudents) }};
+    const months = {{ Illuminate\Support\Js::from($months) }};
+    const currentPeriod = {{ now()->year * 12 + now()->month }};
+    const studentSelect = document.getElementById('futureStudent');
+    const untilMonth = document.getElementById('futureUntilMonth');
+    const untilYear = document.getElementById('futureUntilYear');
+    const summary = document.getElementById('futureStudentSummary');
+    const unpaid = document.getElementById('futureUnpaid');
+    const list = document.getElementById('futureUnpaidList');
+    const total = document.getElementById('futureUnpaidTotal');
+    const range = document.getElementById('futurePaymentRange');
+    const submit = document.getElementById('futurePaymentSubmit');
+    const money = value => 'Rp ' + new Intl.NumberFormat('id-ID').format(value);
+
+    function update(adjustDestination = false) {
+        const student = students[studentSelect.value];
+        list.replaceChildren();
+        unpaid.hidden = true;
+        range.textContent = '';
+        submit.disabled = true;
+        if (!student) {
+            summary.textContent = 'Pilih siswa untuk melihat batas pelunasan, tunggakan, dan bulan awal pembayaran.';
+            return;
+        }
+        const start = student.start_year * 12 + student.start_month;
+        let end = Number(untilYear.value) * 12 + Number(untilMonth.value);
+        if (adjustDestination && end < Math.max(start, currentPeriod)) {
+            end = Math.max(start, currentPeriod);
+            untilYear.value = Math.floor((end - 1) / 12);
+            untilMonth.value = (end - 1) % 12 + 1;
+        }
+        summary.textContent = student.coverage.through
+            ? `${student.name} sudah lunas sampai ${student.coverage.through} (termasuk bulan gratis).`
+            : `${student.name} belum memiliki riwayat pelunasan berurutan yang tercatat.`;
+        if (student.coverage.latest && student.coverage.latest !== student.coverage.through) {
+            summary.textContent += ` Periode lunas paling akhir: ${student.coverage.latest}; ada bulan sebelumnya yang belum selesai atau belum tercatat.`;
+        }
+        summary.textContent += ` Pembayaran berikutnya mulai ${months[student.start_month]} ${student.start_year}.`;
+        if (!student.coverage.latest && student.unpaid.length === 0) {
+            summary.textContent += ' Belum ada data tagihan; bulan awal memakai bulan berjalan.';
+        }
+        if (student.unpaid.length) {
+            unpaid.hidden = false;
+            student.unpaid.forEach(bill => {
+                const item = document.createElement('li');
+                item.textContent = `${bill.label}: ${money(bill.nominal)}`;
+                list.appendChild(item);
+            });
+            total.textContent = `Total ${student.unpaid.length} tagihan tercatat: ${money(student.unpaid.reduce((sum, bill) => sum + bill.nominal, 0))}. Hanya tagihan sampai tujuan yang ikut dibayar.`;
+        }
+        const valid = untilYear.validity.valid && end >= start && end >= currentPeriod;
+        range.textContent = valid
+            ? `Periode pembayaran: ${months[student.start_month]} ${student.start_year} sampai ${months[Number(untilMonth.value)]} ${untilYear.value}.`
+            : 'Pilih periode tujuan minimal bulan awal pembayaran dan tidak sebelum bulan berjalan.';
+        submit.disabled = !valid;
+    }
+    studentSelect.addEventListener('change', () => update(true));
+    untilMonth.addEventListener('change', () => update());
+    untilYear.addEventListener('input', () => update());
+    document.getElementById('futurePaymentModal').addEventListener('show.bs.modal', () => update(true));
+    update();
+});
+</script>
 
 <div class="modal fade" id="setLastPaidModal" tabindex="-1" aria-labelledby="setLastPaidModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">

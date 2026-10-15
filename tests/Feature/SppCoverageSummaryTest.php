@@ -43,4 +43,28 @@ class SppCoverageSummaryTest extends TestCase
     {
         $this->assertSame(['through' => null, 'latest' => null, 'first_unpaid' => null], $this->summary([]));
     }
+
+    public function test_next_payment_starts_after_paid_month_across_year_boundary(): void
+    {
+        $bills = collect([new Tagihan(['bulan' => 'Desember', 'tahun' => 2026, 'status' => 'lunas'])]);
+        $this->assertSame('2027-01-01', (new SppCoverageSummary)->nextPaymentMonth($bills)->toDateString());
+    }
+
+    public function test_next_payment_starts_at_missing_month_before_later_paid_month(): void
+    {
+        $bills = collect([
+            new Tagihan(['bulan' => 'Januari', 'tahun' => 2026, 'status' => 'lunas']),
+            new Tagihan(['bulan' => 'Maret', 'tahun' => 2026, 'status' => 'lunas']),
+        ]);
+        $this->assertSame('2026-02-01', (new SppCoverageSummary)->nextPaymentMonth($bills)->toDateString());
+    }
+
+    public function test_next_payment_keeps_earliest_unpaid_month(): void
+    {
+        $bills = collect([
+            new Tagihan(['bulan' => 'September', 'tahun' => 2026, 'status' => 'menunggu_konfirmasi']),
+            new Tagihan(['bulan' => 'Oktober', 'tahun' => 2026, 'status' => 'lunas']),
+        ]);
+        $this->assertSame('2026-09-01', (new SppCoverageSummary)->nextPaymentMonth($bills)->toDateString());
+    }
 }

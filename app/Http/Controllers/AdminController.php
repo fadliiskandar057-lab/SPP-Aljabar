@@ -323,6 +323,23 @@ class AdminController extends Controller
             ->orderBy('nama')
             ->get();
 
+        $coverageService = app(\App\Services\SppCoverageSummary::class);
+        $futurePaymentStudents = $students->mapWithKeys(function ($student) use ($coverageService) {
+            $start = $coverageService->nextPaymentMonth($student->tagihan);
+            $unpaid = $student->tagihan->whereNotIn('status', ['lunas', 'gratis'])
+                ->sortBy(fn ($bill) => sprintf('%04d%02d', $bill->tahun, $this->monthNumber($bill->bulan)))
+                ->map(fn ($bill) => ['label' => $bill->bulan.' '.$bill->tahun, 'nominal' => (int) $bill->nominal])
+                ->values();
+
+            return [$student->id => [
+                'name' => $student->nama,
+                'coverage' => $coverageService->summarize($student->tagihan),
+                'start_month' => $start->month,
+                'start_year' => $start->year,
+                'unpaid' => $unpaid,
+            ]];
+        });
+
         $studentResult = $search->searchStudents($students, $request->input('keyword') ?? '');
         $filteredStudents = $studentResult['results'];
         $minArrearsMonths = (int) $request->input('min_arrears_months', 0);
@@ -366,6 +383,7 @@ class AdminController extends Controller
             'autoBillSetting' => AutoBillSetting::firstOrCreate([]),
             'meta' => $studentResult + ['count' => $filteredStudents->count()],
             'arrearsSummary' => $arrearsSummary,
+            'futurePaymentStudents' => $futurePaymentStudents,
         ]);
     }
 
@@ -459,12 +477,19 @@ class AdminController extends Controller
         if (! $fee) return back()->withErrors(['biaya' => 'Biaya SPP siswa belum diatur.']);
 
         DB::transaction(function () use ($siswa, $data, $until, $fee) {
-            $cursor = now()->startOfMonth();
+            $existingBills = $siswa->tagihan()->get();
+            $cursor = app(\App\Services\SppCoverageSummary::class)->nextPaymentMonth($existingBills);
+            $existingPeriods = $existingBills->mapWithKeys(fn ($bill) => [
+                sprintf('%04d%02d', $bill->tahun, $this->monthNumber($bill->bulan)) => true,
+            ]);
             while ($cursor->lte($until)) {
-                Tagihan::firstOrCreate([
-                    'siswa_id' => $siswa->id, 'tahun_ajaran_id' => $data['tahun_ajaran_id'],
-                    'bulan' => $this->months()[$cursor->month], 'tahun' => $cursor->year,
-                ], ['nominal' => $fee->nominal, 'jatuh_tempo' => $cursor->copy()->day($this->scheduledDueDay()), 'status' => 'belum_lunas']);
+                // A period already recorded under another academic year must not be billed again.
+                if (! $existingPeriods->has($cursor->format('Ym'))) {
+                    Tagihan::firstOrCreate([
+                        'siswa_id' => $siswa->id, 'tahun_ajaran_id' => $data['tahun_ajaran_id'],
+                        'bulan' => $this->months()[$cursor->month], 'tahun' => $cursor->year,
+                    ], ['nominal' => $fee->nominal, 'jatuh_tempo' => $cursor->copy()->day($this->scheduledDueDay()), 'status' => 'belum_lunas']);
+                }
                 $cursor->addMonth();
             }
         });
