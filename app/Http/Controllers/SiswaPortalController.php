@@ -14,44 +14,52 @@ use Illuminate\Support\Str;
 
 class SiswaPortalController extends Controller
 {
-    public function prepareFuturePayment(Request $request, \App\Services\GenerateMonthlyBillsService $generator)
+    public function prepareFuturePayment(Request $request, \App\Services\FuturePaymentService $future)
     {
         $data = $request->validate(['until' => ['required', 'date_format:Y-m']]);
-        $until = \Carbon\Carbon::createFromFormat('!Y-m', $data['until']);
-        if ($until->lt(now()->startOfMonth()) || $until->gt(now()->startOfMonth()->addYears(100))) {
-            return back()->withInput()->withErrors(['until' => 'Pilih periode bulan ini hingga 100 tahun mendatang.']);
-        }
-        $siswa = auth()->user()->siswa;
-        abort_unless($siswa && $siswa->status === 'aktif', 403);
-        $year = \App\Models\TahunAjaran::where('is_active', true)->first();
-        if (! $year) {
-            return back()->withInput()->withErrors(['until' => 'Tahun ajaran aktif belum diatur. Hubungi TU.']);
-        }
+        $student = auth()->user()->siswa;
+        abort_unless($student, 403);
+        $plan = $future->quote($student, $data['until']);
+        return view('siswa.future_payment_methods', compact('plan'));
+    }
 
-        $stats = \Illuminate\Support\Facades\DB::transaction(function () use ($siswa, $year, $until, $generator) {
-            $siswa->newQuery()->whereKey($siswa->id)->lockForUpdate()->firstOrFail();
-            $existing = $siswa->tagihan()->get();
-            $cursor = app(\App\Services\SppCoverageSummary::class)->nextPaymentMonth($existing);
-            $created = $missingFee = 0;
-            while ($cursor->lte($until)) {
-                $month = $cursor->copy()->locale('id')->translatedFormat('F');
-                if (! $existing->contains(fn ($bill) => (int) $bill->tahun === $cursor->year && $bill->bulan === $month)) {
-                    $dueDay = max(1, min(28, (int) (\App\Models\AutoBillSetting::first()?->due_day ?? 10)));
-                    $result = $generator->generate($year->id, $month, $cursor->year, $cursor->copy()->day($dueDay)->toDateString(), $siswa->id);
-                    $created += $result['created'];
-                    $missingFee += $result['skipped_no_fee'];
-                }
-                $cursor->addMonth();
-            }
-            return compact('created', 'missingFee');
-        });
-
-        if ($stats['missingFee']) {
-            return back()->withInput()->withErrors(['until' => 'Biaya SPP belum diatur. Hubungi TU.']);
+    public function startFuturePayment(Request $request, \App\Services\FuturePaymentService $future, MidtransService $midtrans, WebNotificationService $notifications)
+    {
+        $data = $request->validate([
+            'until' => ['required', 'date_format:Y-m'],
+            'method' => ['required', 'in:tunai,midtrans'],
+        ]);
+        $student = auth()->user()->siswa;
+        abort_unless($student && $student->status === 'aktif', 403);
+        try {
+            [$payment, $snapToken] = \Illuminate\Support\Facades\DB::transaction(function () use ($student, $data, $future, $midtrans) {
+                $student->newQuery()->whereKey($student->id)->lockForUpdate()->firstOrFail();
+                $plan = $future->quote($student, $data['until']);
+                $payment = Pembayaran::create([
+                    'siswa_id' => $student->id, 'tagihan_id' => null,
+                    'kode_invoice' => 'INV-FUT-'.Str::upper(Str::random(16)),
+                    'metode' => $data['method'], 'nominal' => $plan['total'], 'status' => 'pending',
+                    'midtrans_order_id' => $data['method'] === 'midtrans' ? 'SPP-FUT-'.Str::upper(Str::random(16)) : null,
+                    'future_plan' => $plan,
+                ]);
+                $ids = collect($plan['items'])->pluck('id')->filter();
+                Tagihan::where('siswa_id', $student->id)->whereIn('id', $ids)->update(['status' => 'menunggu_konfirmasi']);
+                $snapToken = $data['method'] === 'midtrans' ? $midtrans->createSnapToken($payment->load('siswa', 'tagihan')) : null;
+                return [$payment, $snapToken];
+            });
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            throw $exception;
+        } catch (\Throwable $exception) {
+            report($exception);
+            return redirect()->route('siswa.tagihan')->withInput($data)->withErrors(['until' => 'Pembayaran belum dapat dibuat. Silakan coba lagi. Tidak ada tagihan masa depan yang disimpan.']);
         }
-        return redirect()->route('siswa.tagihan')->with('success', $stats['created']
-            ? 'Tagihan sampai periode pilihan siap. Pilih Online atau Tunai pada setiap bulan yang ingin dibayar.'
-            : 'Periode pilihan sudah tercatat. Pilih Online atau Tunai pada tagihan yang belum lunas.');
+        if ($payment->metode === 'tunai') {
+            $notifications->toRole('bendahara', 'Invoice tunai masa depan',
+                $student->nama.' mengajukan pembayaran sampai '.$data['until'].'. Invoice '.$payment->kode_invoice,
+                route('treasury.cash.queue'), 'warning');
+            return redirect()->route('invoice.show', $payment)->with('success', 'Invoice tunai dibuat. Bawa ke TU untuk konfirmasi. Tagihan masa depan dicatat setelah pembayaran dikonfirmasi.');
+        }
+        return view('siswa.midtrans', compact('payment', 'snapToken'));
     }
 
     public function bills(MidtransPendingPaymentCleaner $midtransCleaner)
@@ -232,6 +240,18 @@ class SiswaPortalController extends Controller
     public function cancelPendingPayment(Pembayaran $pembayaran)
     {
         abort_unless($pembayaran->siswa_id === auth()->user()->siswa_id, 403);
+
+        if ($pembayaran->future_plan) {
+            return \Illuminate\Support\Facades\DB::transaction(function () use ($pembayaran) {
+                $payment = Pembayaran::lockForUpdate()->findOrFail($pembayaran->id);
+                if ($payment->status !== 'pending') {
+                    return back()->withErrors(['pembayaran' => 'Hanya pembayaran pending yang bisa dibatalkan.']);
+                }
+                $payment->update(['status' => 'cancelled']);
+                Pembayaran::revertPrecedingBills($payment);
+                return redirect()->route('siswa.tagihan')->with('success', 'Pembayaran masa depan dibatalkan. Tidak ada tagihan masa depan yang dibuat.');
+            });
+        }
 
         if ($pembayaran->status !== 'pending') {
             return back()->withErrors(['pembayaran' => 'Hanya pembayaran yang masih pending yang bisa dibatalkan.']);

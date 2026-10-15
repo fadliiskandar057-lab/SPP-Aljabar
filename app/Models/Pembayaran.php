@@ -9,17 +9,23 @@ class Pembayaran extends Model
     protected $table = 'pembayaran';
     protected $fillable = [
         'tagihan_id', 'siswa_id', 'kode_invoice', 'metode', 'nominal', 'status',
-        'midtrans_order_id', 'midtrans_transaction_id', 'paid_at', 'verified_by', 'bukti_path',
+        'midtrans_order_id', 'midtrans_transaction_id', 'paid_at', 'verified_by', 'bukti_path', 'future_plan',
     ];
 
     protected function casts(): array
     {
-        return ['paid_at' => 'datetime'];
+        return ['paid_at' => 'datetime', 'future_plan' => 'array'];
     }
 
     public function tagihan()
     {
-        return $this->belongsTo(Tagihan::class);
+        return $this->belongsTo(Tagihan::class)->withDefault(function (Tagihan $bill, Pembayaran $payment) {
+            if ($payment->future_plan) {
+                $last = collect($payment->future_plan['items'])->last();
+                $bill->fill($last);
+                $bill->status = $payment->status === 'pending' ? 'menunggu_konfirmasi' : 'belum_lunas';
+            }
+        });
     }
 
     public function siswa()
@@ -34,6 +40,10 @@ class Pembayaran extends Model
 
     public static function resolveMultiBillPayment(self $payment)
     {
+        if ($payment->future_plan) {
+            app(\App\Services\FuturePaymentService::class)->settle($payment);
+            return;
+        }
         $tagihan = $payment->tagihan;
         if (!$tagihan) return;
 
@@ -112,6 +122,10 @@ class Pembayaran extends Model
 
     public static function revertPrecedingBills(self $payment)
     {
+        if ($payment->future_plan) {
+            app(\App\Services\FuturePaymentService::class)->release($payment);
+            return;
+        }
         $tagihan = $payment->tagihan;
         if (!$tagihan) return;
 

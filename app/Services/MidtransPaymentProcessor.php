@@ -22,6 +22,10 @@ class MidtransPaymentProcessor
                 return $locked;
             }
 
+            if (in_array($locked->status, ['settlement', 'success'], true) && ! in_array($status, ['capture', 'settlement'], true)) {
+                return $locked;
+            }
+
             if (in_array($status, ['capture', 'settlement'], true)) {
                 $wasPaid = in_array($locked->status, ['settlement', 'success'], true);
                 $locked->update([
@@ -30,8 +34,10 @@ class MidtransPaymentProcessor
                     'paid_at' => $locked->paid_at ?? now(),
                 ]);
                 $locked->tagihan()->update(['status' => 'lunas']);
-                Pembayaran::where('tagihan_id', $locked->tagihan_id)->where('id', '!=', $locked->id)
-                    ->where('status', 'pending')->update(['status' => 'cancelled']);
+                if ($locked->tagihan_id) {
+                    Pembayaran::where('tagihan_id', $locked->tagihan_id)->where('id', '!=', $locked->id)
+                        ->where('status', 'pending')->update(['status' => 'cancelled']);
+                }
                 Pembayaran::resolveMultiBillPayment($locked);
                 if (! $wasPaid) {
                     $parts = Pembayaran::with('tagihan')->where('siswa_id', $locked->siswa_id)
@@ -47,6 +53,11 @@ class MidtransPaymentProcessor
                         'periods' => $parts->sortBy(fn ($part) => $part->tagihan->jatuh_tempo->format('Y-m-d'))
                             ->map(fn ($part) => $part->tagihan->bulan.' '.$part->tagihan->tahun)->implode(', '),
                     ];
+                    if ($locked->future_plan) {
+                        $items = collect($locked->future_plan['items']);
+                        $summary = ['total' => (int) $locked->future_plan['total'], 'months' => $items->count(),
+                            'periods' => $items->map(fn ($item) => $item['bulan'].' '.$item['tahun'])->implode(', ')];
+                    }
                     $message = "{$locked->siswa->nama} membayar SPP {$summary['months']} bulan melalui Midtrans, total Rp "
                         .number_format($summary['total'], 0, ',', '.').". Periode: {$summary['periods']}. Invoice {$locked->kode_invoice}.";
                     app(ActivityLogger::class)->record(auth()->user(), 'payment.midtrans_settled', $locked, $message, $summary, null, false);

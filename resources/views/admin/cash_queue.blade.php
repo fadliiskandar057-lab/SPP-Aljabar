@@ -54,7 +54,7 @@
                             </div>
                         </td>
                         <td><span class="cash-chip">{{ $p->siswa->kelas->nama_kelas }}</span></td>
-                        <td>{{ $p->tagihan->bulan }} {{ $p->tagihan->tahun }}</td>
+                        <td>@if($p->future_plan){{ count($p->future_plan['items']) }} bulan sampai @endif{{ $p->tagihan->bulan }} {{ $p->tagihan->tahun }}</td>
                         <td><strong class="cash-money">Rp {{ number_format($p->nominal,0,',','.') }}</strong></td>
                         <td class="text-end text-nowrap">
                             <x-whatsapp-link :phone="$p->siswa->no_hp_orang_tua" :message="$message" label="WA" class="btn btn-sm btn-success" />

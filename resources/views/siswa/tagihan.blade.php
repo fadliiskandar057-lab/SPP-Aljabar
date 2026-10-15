@@ -25,7 +25,7 @@
             <div class="row g-4 align-items-center">
                 <div class="col-md-6">
                     <p class="mb-2 fw-semibold">Pilih sampai bulan apa ingin membayar</p>
-                    <p class="text-muted small mb-0" id="futurePaymentHelp">Tagihan disiapkan mulai periode yang belum tercakup sampai bulan pilihan, mengikuti biaya dan diskon SPP. Setelah itu, bayar setiap bulan melalui Online atau Tunai ke TU. Status lunas diperbarui setelah pembayaran terverifikasi.</p>
+                    <p class="text-muted small mb-0" id="futurePaymentHelp">Lihat total SPP sampai bulan pilihan, termasuk tunggakan sebelumnya. Berikutnya, pilih pembayaran Tunai atau Online untuk seluruh periode. Tagihan masa depan baru dicatat setelah pembayaran berhasil atau dikonfirmasi TU.</p>
                 </div>
                 <div class="col-md-6">
                     <form method="post" action="{{ route('siswa.future-payment') }}">
@@ -33,10 +33,10 @@
                         <label for="futurePaymentUntil" class="form-label fw-semibold">Periode akhir pembayaran</label>
                         <div class="d-flex flex-wrap gap-2">
                             <input type="month" id="futurePaymentUntil" name="until" class="form-control w-auto flex-grow-1 @error('until') is-invalid @enderror" min="{{ now()->format('Y-m') }}" max="{{ now()->startOfMonth()->addYears(100)->format('Y-m') }}" value="{{ old('until', now()->addMonthNoOverflow()->format('Y-m')) }}" aria-describedby="futurePaymentHelp @error('until') futurePaymentError @enderror" required>
-                            <button class="btn btn-primary" type="submit"><i class="bi bi-arrow-right-circle" aria-hidden="true"></i>Siapkan Tagihan</button>
+                            <button class="btn btn-primary" type="submit"><i class="bi bi-arrow-right-circle" aria-hidden="true"></i>Lihat Pilihan Pembayaran</button>
                         </div>
                         @error('until')<p class="text-danger small mt-2 mb-0" id="futurePaymentError" role="alert">{{ $message }}</p>@enderror
-                        <p class="text-muted small mt-2 mb-0"><i class="bi bi-info-circle" aria-hidden="true"></i>Menyiapkan tagihan belum melakukan pembayaran.</p>
+                        <p class="text-muted small mt-2 mb-0"><i class="bi bi-info-circle" aria-hidden="true"></i>Melihat pilihan pembayaran tidak membuat tagihan baru.</p>
                     </form>
                 </div>
             </div>

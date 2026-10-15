@@ -35,10 +35,10 @@ class MidtransService
                 'phone' => $student->no_hp_orang_tua,
             ],
             'item_details' => [[
-                'id' => $payment->tagihan_id,
+                'id' => $payment->tagihan_id ?? 'FUT-'.$payment->id,
                 'price' => (int) $payment->nominal,
                 'quantity' => 1,
-                'name' => 'SPP '.$payment->tagihan->bulan.' '.$payment->tagihan->tahun,
+                'name' => ($payment->future_plan ? 'SPP sampai ' : 'SPP ').$payment->tagihan->bulan.' '.$payment->tagihan->tahun,
             ]],
             'expiry' => [
                 'start_time' => $payment->created_at->timezone(config('app.timezone'))->format('Y-m-d H:i:s O'),
@@ -69,7 +69,8 @@ class MidtransService
             throw new \RuntimeException('Respons status Midtrans tidak cocok dengan invoice pembayaran.');
         }
 
-        if ((int) round((float) ($payload['gross_amount'] ?? 0)) !== (int) $payment->nominal) {
+        $expectedAmount = $payment->future_plan['total'] ?? $payment->nominal;
+        if ((int) round((float) ($payload['gross_amount'] ?? 0)) !== (int) $expectedAmount) {
             throw new \RuntimeException('Nominal pada respons Midtrans tidak cocok dengan invoice pembayaran.');
         }
 

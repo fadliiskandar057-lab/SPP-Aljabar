@@ -722,14 +722,33 @@ class AdminController extends Controller
     public function confirmCash(Pembayaran $pembayaran, WebNotificationService $notifications, ActivityLogger $activities)
     {
         abort_unless($pembayaran->metode === 'tunai', 422);
-        $pembayaran->update(['status' => 'success', 'paid_at' => now(), 'verified_by' => auth()->id()]);
-        $pembayaran->tagihan()->update(['status' => 'lunas']);
+        $confirmed = DB::transaction(function () use ($pembayaran) {
+            $payment = Pembayaran::lockForUpdate()->findOrFail($pembayaran->id);
+            if ($payment->status !== 'pending') {
+                return false;
+            }
+            $payment->update(['status' => 'success', 'paid_at' => now(), 'verified_by' => auth()->id()]);
+            if ($payment->future_plan) {
+                Pembayaran::resolveMultiBillPayment($payment);
+            } else {
+                $payment->tagihan()->update(['status' => 'lunas']);
+            }
+            return true;
+        });
+        if (! $confirmed) {
+            return back()->withErrors(['pembayaran' => 'Pembayaran ini sudah diproses atau dibatalkan.']);
+        }
         $pembayaran = $pembayaran->fresh()->load('siswa.kelas', 'tagihan');
-        $activities->record(auth()->user(), 'payment.cash_confirmed', $pembayaran, auth()->user()->name." mengonfirmasi pembayaran tunai {$pembayaran->kode_invoice} milik {$pembayaran->siswa->nama} ({$pembayaran->siswa->nis}) pada ".now()->timezone(config('app.timezone'))->format('d/m/Y H:i').' WIB.', [], route('activities.index'));
+        $cashTotal = $pembayaran->future_plan['total'] ?? $pembayaran->nominal;
+        $cashPeriod = $pembayaran->future_plan
+            ? count($pembayaran->future_plan['items']).' bulan sampai '.Carbon::createFromFormat('!Y-m', $pembayaran->future_plan['until'])->locale('id')->translatedFormat('F Y')
+            : $pembayaran->tagihan->bulan.' '.$pembayaran->tagihan->tahun;
+        $cashMessage = "Pembayaran tunai {$cashPeriod} sebesar Rp ".number_format($cashTotal, 0, ',', '.')." sudah lunas. Invoice {$pembayaran->kode_invoice}.";
+        $activities->record(auth()->user(), 'payment.cash_confirmed', $pembayaran, auth()->user()->name." mengonfirmasi pembayaran tunai {$pembayaran->kode_invoice} milik {$pembayaran->siswa->nama} ({$pembayaran->siswa->nis}). ".$cashMessage, ['total' => (int) $cashTotal], route('activities.index'));
         $notifications->toStudent(
             $pembayaran->siswa_id,
             'Pembayaran tunai dikonfirmasi',
-            "Pembayaran tunai {$pembayaran->tagihan->bulan} {$pembayaran->tagihan->tahun} sebesar Rp ".number_format($pembayaran->nominal, 0, ',', '.')." sudah lunas. Invoice {$pembayaran->kode_invoice}.",
+            $cashMessage,
             route('siswa.riwayat'),
             'success',
         );
@@ -737,7 +756,7 @@ class AdminController extends Controller
             $notifications->toClassGuardians(
                 $pembayaran->siswa->kelas_id,
                 'Pembayaran tunai siswa lunas',
-                "{$pembayaran->siswa->nama} ({$pembayaran->siswa->kelas->nama_kelas}) sudah dikonfirmasi lunas untuk {$pembayaran->tagihan->bulan} sebesar Rp ".number_format($pembayaran->nominal, 0, ',', '.').'.',
+                "{$pembayaran->siswa->nama} ({$pembayaran->siswa->kelas->nama_kelas}). ".$cashMessage,
                 route('wali.payments'),
                 'success',
             );

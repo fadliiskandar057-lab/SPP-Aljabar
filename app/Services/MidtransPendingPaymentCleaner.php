@@ -19,6 +19,18 @@ class MidtransPendingPaymentCleaner
         $deleted = 0;
 
         foreach ($expiredPayments as $payment) {
+            if ($payment->future_plan) {
+                $deleted += \Illuminate\Support\Facades\DB::transaction(function () use ($payment) {
+                    $locked = Pembayaran::lockForUpdate()->find($payment->id);
+                    if (! $locked || $locked->status !== 'pending') {
+                        return 0;
+                    }
+                    Pembayaran::revertPrecedingBills($locked);
+                    $locked->delete();
+                    return 1;
+                });
+                continue;
+            }
             $tagihan = $payment->tagihan;
             Pembayaran::revertPrecedingBills($payment);
             $payment->delete();

@@ -9,14 +9,20 @@
     <dl class="row">
         <dt class="col-sm-3">Nama Siswa</dt><dd class="col-sm-9">{{ $payment->siswa->nama }}</dd>
         <dt class="col-sm-3">NIS / Kelas</dt><dd class="col-sm-9">{{ $payment->siswa->nis }} / {{ $payment->siswa->kelas->nama_kelas }}</dd>
-        <dt class="col-sm-3">Bulan SPP</dt><dd class="col-sm-9">{{ $payment->tagihan->bulan }} {{ $payment->tagihan->tahun }}</dd>
-        <dt class="col-sm-3">Nominal</dt><dd class="col-sm-9">Rp {{ number_format($payment->nominal,0,',','.') }}</dd>
+        <dt class="col-sm-3">Bulan SPP</dt><dd class="col-sm-9">@if($payment->future_plan){{ count($payment->future_plan['items']) }} bulan sampai {{ \Carbon\Carbon::createFromFormat('!Y-m', $payment->future_plan['until'])->locale('id')->translatedFormat('F Y') }}@else{{ $payment->tagihan->bulan }} {{ $payment->tagihan->tahun }}@endif</dd>
+        <dt class="col-sm-3">Nominal</dt><dd class="col-sm-9">Rp {{ number_format($payment->future_plan['total'] ?? $payment->nominal,0,',','.') }}</dd>
         <dt class="col-sm-3">Metode</dt><dd class="col-sm-9">{{ strtoupper($payment->metode) }}</dd>
         <dt class="col-sm-3">Tanggal Lunas</dt><dd class="col-sm-9">{{ $payment->paid_at?->format('d/m/Y H:i') ?? 'Menunggu konfirmasi' }}</dd>
         @if($payment->bukti_path)
             <dt class="col-sm-3">Bukti Foto</dt><dd class="col-sm-9"><a href="{{ asset($payment->bukti_path) }}" target="_blank">Lihat bukti pembayaran</a></dd>
         @endif
     </dl>
+    @if($payment->future_plan)
+        @if($payment->status === 'pending')<p class="alert alert-info">Invoice ini belum lunas. Tagihan masa depan baru dicatat setelah pembayaran terverifikasi.</p>@endif
+        <details class="mb-3"><summary>Rincian periode pembayaran</summary>
+            <ul class="mt-2">@foreach($payment->future_plan['items'] as $item)<li>{{ $item['bulan'] }} {{ $item['tahun'] }}: Rp {{ number_format($item['nominal'], 0, ',', '.') }}</li>@endforeach</ul>
+        </details>
+    @endif
     <div class="d-flex flex-wrap gap-2">
         <a class="btn btn-danger" href="{{ route('invoice.download',$payment) }}">Download PDF</a>
         @if(auth()->user()?->role === 'siswa' && $payment->status === 'pending')

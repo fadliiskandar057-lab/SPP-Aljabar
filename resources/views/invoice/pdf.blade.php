@@ -272,7 +272,7 @@
     <table class="detail-table">
         <tr>
             <td class="detail-label">Pembayaran Untuk</td>
-            <td class="detail-value">SPP Bulan {{ $payment->tagihan->bulan }} {{ $payment->tagihan->tahun }}</td>
+            <td class="detail-value">SPP @if($payment->future_plan){{ count($payment->future_plan['items']) }} bulan sampai {{ \Carbon\Carbon::createFromFormat('!Y-m', $payment->future_plan['until'])->locale('id')->translatedFormat('F Y') }}@else Bulan {{ $payment->tagihan->bulan }} {{ $payment->tagihan->tahun }}@endif</td>
         </tr>
         <tr>
             <td class="detail-label">Metode Pembayaran</td>
@@ -286,7 +286,7 @@
 
     <div class="amount-box">
         <div class="amount-label">Total pembayaran diterima</div>
-        <div class="amount-value">Rp {{ number_format($payment->nominal, 0, ',', '.') }}</div>
+        <div class="amount-value">Rp {{ number_format($payment->future_plan['total'] ?? $payment->nominal, 0, ',', '.') }}</div>
     </div>
 
     <div class="note">

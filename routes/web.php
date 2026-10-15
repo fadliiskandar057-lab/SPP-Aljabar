@@ -38,6 +38,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:siswa')->prefix('siswa')->name('siswa.')->group(function () {
         Route::get('/tagihan', [SiswaPortalController::class, 'bills'])->name('tagihan');
         Route::post('/bayar-masa-depan', [SiswaPortalController::class, 'prepareFuturePayment'])->name('future-payment');
+        Route::post('/bayar-masa-depan/bayar', [SiswaPortalController::class, 'startFuturePayment'])->name('future-payment.start');
         Route::get('/riwayat', [SiswaPortalController::class, 'history'])->name('riwayat');
         Route::get('/profil', [SiswaPortalController::class, 'profile'])->name('profil');
         Route::post('/tagihan/{tagihan}/tunai', [SiswaPortalController::class, 'cash'])->name('cash');
