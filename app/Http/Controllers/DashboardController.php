@@ -17,7 +17,7 @@ class DashboardController extends Controller
         $user = auth()->user();
 
         if ($user->role === 'siswa') {
-            $tagihan = Tagihan::where('siswa_id', $user->siswa_id)->latest()->get();
+            $tagihan = Tagihan::with('pembayaran')->where('siswa_id', $user->siswa_id)->latestPeriod()->get();
             $payments = Pembayaran::where('siswa_id', $user->siswa_id)
                 ->where('status', '!=', 'cancelled')
                 ->latest()

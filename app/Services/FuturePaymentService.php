@@ -140,5 +140,7 @@ class FuturePaymentService
         $ids = collect($payment->future_plan['items'])->pluck('id')->filter();
         Tagihan::where('siswa_id', $payment->siswa_id)->whereIn('id', $ids)
             ->where('status', 'menunggu_konfirmasi')->update(['status' => 'belum_lunas']);
+        // A reserved current month can now be issued by the automatic calendar.
+        DB::afterCommit(fn () => AutoBillSetting::query()->update(['last_checked_at' => null]));
     }
 }

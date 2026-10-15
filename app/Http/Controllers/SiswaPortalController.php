@@ -64,14 +64,22 @@ class SiswaPortalController extends Controller
 
     public function bills(MidtransPendingPaymentCleaner $midtransCleaner)
     {
-        $midtransCleaner->deleteExpired();
+        if ($midtransCleaner->deleteExpired() > 0) {
+            app(\App\Services\AutomaticBillingService::class)->sync();
+        }
 
         $tagihan = Tagihan::with(['pembayaran' => fn ($q) => $q->latest()])
             ->where('siswa_id', auth()->user()->siswa_id)
-            ->latest()
+            ->latestPeriod()
             ->paginate(12);
         $coverage = $this->sppCoverage();
-        return view('siswa.tagihan', compact('tagihan', 'coverage'));
+        $billingSchedule = \App\Models\AutoBillSetting::first();
+        $currentBill = Tagihan::where('siswa_id', auth()->user()->siswa_id)
+            ->where('bulan', now()->locale('id')->translatedFormat('F'))->where('tahun', now()->year)->first();
+        $pendingCurrentPayment = Pembayaran::where('siswa_id', auth()->user()->siswa_id)->where('status', 'pending')
+            ->whereNotNull('future_plan')->get()->first(fn ($payment) => collect($payment->future_plan['items'])
+                ->contains(fn ($item) => $item['bulan'] === now()->locale('id')->translatedFormat('F') && (int) $item['tahun'] === now()->year));
+        return view('siswa.tagihan', compact('tagihan', 'coverage', 'billingSchedule', 'currentBill', 'pendingCurrentPayment'));
     }
 
     public function history(MidtransPendingPaymentCleaner $midtransCleaner)

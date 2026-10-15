@@ -280,15 +280,23 @@ class AdminController extends Controller
             'is_enabled' => ['nullable'],
             'generate_day' => ['required', 'integer', 'between:1,28'],
             'due_day' => ['required', 'integer', 'between:1,28'],
+            'starts_month' => ['nullable', 'date_format:Y-m'],
         ]);
 
-        AutoBillSetting::firstOrCreate([])->update([
+        $setting = AutoBillSetting::firstOrCreate([]);
+        $start = filled($data['starts_month'] ?? null) ? Carbon::createFromFormat('!Y-m', $data['starts_month']) : ($setting->starts_on ?? now()->startOfMonth());
+        $setting->update([
             'is_enabled' => $request->boolean('is_enabled'),
             'generate_day' => $data['generate_day'],
             'due_day' => $data['due_day'],
+            'starts_on' => $start,
+            'last_checked_at' => null,
+            'last_generated_period' => null,
         ]);
-
-        return back()->with('success', 'Jadwal tagihan otomatis diperbarui.');
+        if ($setting->is_enabled) {
+            app(\App\Services\AutomaticBillingService::class)->sync();
+        }
+        return redirect()->to(route('admin.settings').'#tab-otomatis')->with('success', 'Jadwal tersimpan. Tagihan mengikuti kalender aplikasi dan periode mulai yang dipilih.');
     }
 
     public function storeTagihanExemption(Request $request)

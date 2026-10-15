@@ -11,6 +11,7 @@
         <div class="role-hero-actions"><span class="role-icon-tile"><i class="bi bi-receipt-cutoff"></i></span></div>
     </section>
 
+    @include('siswa.current_bill')
     @include('partials.spp_coverage')
     @if(auth()->user()->siswa?->status === 'aktif')
     <section class="role-table-card" id="bayar-masa-depan" aria-labelledby="futurePaymentTitle">

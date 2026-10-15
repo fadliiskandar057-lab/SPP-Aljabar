@@ -282,8 +282,8 @@
         <p>Kelola data dasar pembayaran SPP dari satu halaman: kelas, tahun ajaran, nominal biaya, dan pembuatan tagihan bulanan.</p>
     </div>
     <div class="spp-header-actions">
-        <button class="btn btn-primary" data-bs-toggle="tab" data-bs-target="#tab-biaya" type="button"><i class="bi bi-cash-stack"></i>Atur Biaya</button>
-        <button class="btn btn-outline-primary" data-bs-toggle="tab" data-bs-target="#tab-otomatis" type="button"><i class="bi bi-calendar2-week"></i>Jadwal Otomatis</button>
+        <button class="btn btn-primary" data-settings-tab="#tab-biaya" type="button"><i class="bi bi-cash-stack"></i>Atur Biaya</button>
+        <button class="btn btn-outline-primary" data-settings-tab="#tab-otomatis" type="button"><i class="bi bi-calendar2-week"></i>Jadwal Otomatis</button>
     </div>
 </div>
 
@@ -537,28 +537,31 @@
     </div>
 
     <div class="tab-pane fade" id="tab-otomatis" role="tabpanel">
+        @include('admin.partials.automatic_billing_status')
         <div class="spp-panel-grid mb-3">
             <div class="content-card spp-form-card">
                 <div class="spp-card-title">
                     <i class="bi bi-calendar2-check"></i>
-                    <div><h6>Jadwal Tagihan Otomatis</h6><small>Generate bulanan mengikuti tahun ajaran aktif</small></div>
+                    <div><h6>Jadwal Tagihan Otomatis</h6><small>Terbit setiap bulan mengikuti kalender dan tahun ajaran aktif</small></div>
                 </div>
                 <form method="post" action="{{ route('admin.auto-bill.update') }}" class="row g-3">
                     @csrf
                     <div class="col-12">
                         <div class="form-check form-switch">
                             <input name="is_enabled" type="checkbox" class="form-check-input" id="autoBillEnabled" @checked($autoBillSetting->is_enabled)>
-                            <label class="form-check-label" for="autoBillEnabled">Aktifkan generate otomatis</label>
+                            <label class="form-check-label" for="autoBillEnabled">Aktifkan tagihan otomatis</label>
                         </div>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">Tanggal Tagihan Keluar</label>
-                        <input name="generate_day" type="number" min="1" max="28" class="form-control" value="{{ $autoBillSetting->generate_day }}" required>
+                        <label for="automaticReleaseDay" class="form-label">Tanggal Tagihan Keluar</label>
+                        <input id="automaticReleaseDay" name="generate_day" type="number" min="1" max="28" class="form-control" value="{{ old('generate_day', $autoBillSetting->generate_day) }}" required>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">Tanggal Jatuh Tempo</label>
-                        <input name="due_day" type="number" min="1" max="28" class="form-control" value="{{ $autoBillSetting->due_day }}" required>
+                        <label for="automaticDueDay" class="form-label">Tanggal Jatuh Tempo</label>
+                        <input id="automaticDueDay" name="due_day" type="number" min="1" max="28" class="form-control" value="{{ old('due_day', $autoBillSetting->due_day) }}" required>
+                        <small class="text-muted">Jika sebelum tanggal terbit, jatuh tempo berlaku pada bulan berikutnya.</small>
                     </div>
+                    <div class="col-12"><label for="automaticStartsMonth" class="form-label">Mulai membentuk tagihan dari bulan</label><input id="automaticStartsMonth" name="starts_month" type="month" class="form-control" value="{{ old('starts_month', $autoBillSetting->starts_on?->format('Y-m') ?? now()->format('Y-m')) }}" required><small class="text-muted">Pilih bulan berjalan untuk memulai sekarang. Pilih bulan sebelumnya hanya jika ingin membuat tagihan untuk periode yang terlewat.</small></div>
                     <div class="col-12">
                         <button class="btn btn-primary w-100" type="submit"><i class="bi bi-save me-1"></i>Simpan Jadwal</button>
                     </div>
@@ -697,6 +700,16 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    const openSettingsTab = target => {
+        const trigger = [...document.querySelectorAll('.spp-tabs .nav-link')].find(tab => tab.dataset.bsTarget === target);
+        if (!trigger || !window.bootstrap?.Tab) return;
+        window.bootstrap.Tab.getOrCreateInstance(trigger).show();
+        history.replaceState(null, '', target);
+    };
+    document.querySelectorAll('[data-settings-tab]').forEach(button => {
+        button.addEventListener('click', () => openSettingsTab(button.dataset.settingsTab));
+    });
+    if (location.hash) openSettingsTab(location.hash);
     const scopeSelect = document.getElementById('exemptionScopeSelect');
     const classSelect = document.getElementById('exemptionClassSelect');
     const studentSelect = document.getElementById('exemptionStudentSelect');
