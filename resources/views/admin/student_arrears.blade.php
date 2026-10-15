@@ -139,6 +139,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 
+@include('admin.partials.reopen_bill_modal')
+
 <div class="modal fade" id="setLastPaidModal" tabindex="-1" aria-labelledby="setLastPaidModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
@@ -329,10 +331,16 @@ document.addEventListener('DOMContentLoaded', () => {
                                                         $paidMonthNumber = array_search($paidBill->bulan, $months, true) ?: $paidBill->bulan;
                                                         $paidCode = $paidMonthNumber.'-'.substr((string) $paidBill->tahun, -2);
                                                     @endphp
-                                                    <form method="post" action="{{ route('treasury.arrears.reopen-bill', [$item, $paidBill]) }}" class="d-inline" onsubmit="return confirm('Buka ulang tagihan {{ $paidBill->bulan }} {{ $paidBill->tahun }}? Transaksi manual terkait akan dibatalkan.')">
-                                                        @csrf
-                                                        <button class="arrears-bubble paid" type="submit">{{ $paidCode }}</button>
-                                                    </form>
+                                                    <button class="arrears-bubble paid" type="button"
+                                                        data-bs-toggle="modal" data-bs-target="#reopenBillModal"
+                                                        data-reopen-url="{{ route('treasury.arrears.reopen-bill', [$item, $paidBill]) }}"
+                                                        data-student="{{ $item->nama }}" data-nis="{{ $item->nis }}"
+                                                        data-period="{{ $paidBill->bulan }} {{ $paidBill->tahun }}"
+                                                        data-amount="Rp {{ number_format($paidBill->nominal, 0, ',', '.') }}"
+                                                        data-blocked="{{ $paidBill->pembayaran->contains(fn ($payment) => in_array($payment->status, ['success', 'settlement'], true) && $payment->metode !== 'manual') ? '1' : '0' }}"
+                                                        aria-label="Buka ulang tagihan {{ $paidBill->bulan }} {{ $paidBill->tahun }} untuk {{ $item->nama }}">
+                                                        {{ $paidCode }}
+                                                    </button>
                                                 @endforeach
                                             </div>
                                         </div>
