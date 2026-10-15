@@ -52,6 +52,21 @@ class FuturePaymentTest extends TestCase
 
         $this->get(route('treasury.arrears.students'))->assertOk()
             ->assertSee('futureStudentSummary')->assertSee('futureUnpaidList')->assertSee('futurePaymentRange');
+
+        $payment = \App\Models\Pembayaran::create([
+            'siswa_id' => $student->id, 'tagihan_id' => $student->tagihan()->where('status', 'belum_lunas')->firstOrFail()->id,
+            'kode_invoice' => 'INV-FINISH-TEST', 'metode' => 'midtrans', 'nominal' => 100000, 'status' => 'pending',
+        ]);
+        $this->mock(\App\Services\MidtransService::class, function ($mock) {
+            $mock->shouldReceive('getTransactionStatus')->twice()->andReturn(['transaction_status' => 'pending']);
+        });
+        $this->mock(\App\Services\MidtransPaymentProcessor::class, function ($mock) {
+            $mock->shouldReceive('process')->twice()->andReturn('pending', 'settlement');
+        });
+        $this->postJson(route('treasury.arrears.midtrans.finish', $payment))
+            ->assertOk()->assertJson(['status' => 'pending', 'paid' => false]);
+        $this->postJson(route('treasury.arrears.midtrans.finish', $payment))
+            ->assertOk()->assertJson(['status' => 'settlement', 'paid' => true]);
         $this->travelBack();
     }
 }

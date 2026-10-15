@@ -175,13 +175,18 @@ class SiswaPortalController extends Controller
 
         try {
             // Never trust browser callback fields as proof of payment.
-            $processor->process($pembayaran, $midtrans->getTransactionStatus($pembayaran), $notifications);
+            $status = $processor->process($pembayaran, $midtrans->getTransactionStatus($pembayaran), $notifications);
         } catch (\Throwable $exception) {
             report($exception);
             return response()->json(['ok' => false, 'message' => 'Status pembayaran belum dapat diverifikasi. Coba buka riwayat beberapa saat lagi.'], 422);
         }
 
-        return response()->json(['ok' => true, 'redirect' => route('siswa.riwayat')]);
+        return response()->json([
+            'ok' => true,
+            'status' => $status,
+            'paid' => in_array($status, ['settlement', 'success'], true),
+            'redirect' => route('siswa.riwayat'),
+        ]);
     }
 
     public function cancelPendingPayment(Pembayaran $pembayaran)

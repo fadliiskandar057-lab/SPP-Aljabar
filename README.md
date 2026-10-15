@@ -449,6 +449,14 @@ php artisan view:cache
 
 Tes mencakup akses peran, autentikasi, persiapan masa depan tanpa pelunasan langsung, serta urutan ringkasan. Keberadaan tes bukan bukti lulus pada instalasi Anda. Uji browser/Midtrans Sandbox secara terpisah.
 
+Tes JavaScript alur verifikasi Midtrans dapat dijalankan tanpa Laravel dengan Node.js:
+
+```powershell
+node --test tests/JavaScript/midtrans-finish.test.cjs
+```
+
+Setelah callback Snap, aplikasi memeriksa status server hingga lima kali. Halaman kembali ke daftar hanya setelah pembayaran terverifikasi berhasil; jika masih pending atau verifikasi gagal, tombol Periksa Status Pembayaran tersedia. Daftar tunggakan yang dipulihkan dari riwayat browser dimuat ulang untuk memperbarui status.
+
 Skenario penerimaan: login lima peran, siapkan tagihan, konfirmasi tunai, selesaikan Sandbox, periksa invoice, bayar masa depan, cocokkan Lunas sampai, buka/ekspor laporan.
 
 ## Pemecahan masalah

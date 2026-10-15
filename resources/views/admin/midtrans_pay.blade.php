@@ -52,31 +52,6 @@
 
 @push('scripts')
 <script src="{{ config('services.midtrans.is_production') ? 'https://app.midtrans.com/snap/snap.js' : 'https://app.sandbox.midtrans.com/snap/snap.js' }}" data-client-key="{{ config('services.midtrans.client_key') }}"></script>
-<script>
-async function finishPayment(result) {
-    const response = await fetch('{{ route('treasury.arrears.midtrans.finish', $pembayaran) }}', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': '{{ csrf_token() }}',
-            'Accept': 'application/json'
-        },
-        body: '{}'
-    });
-    const data = await response.json();
-    if (!response.ok) {
-        alert(data.message || 'Status pembayaran belum dapat diverifikasi.');
-    }
-    location.href = data.redirect || '{{ route('treasury.arrears.students') }}';
-}
-
-document.getElementById('pay-button').onclick = function () {
-    snap.pay('{{ $snapToken }}', {
-        onSuccess: finishPayment,
-        onPending: function () { location.href = '{{ route('treasury.arrears.students') }}'; },
-        onError: function () { alert('Pembayaran gagal'); }
-    });
-};
-</script>
+@include('partials.midtrans_finish_script', ['finishUrl' => route('treasury.arrears.midtrans.finish', $pembayaran), 'snapToken' => $snapToken])
 @endpush
 @endsection

@@ -72,6 +72,9 @@
 </div>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+    window.addEventListener('pageshow', event => {
+        if (event.persisted) window.location.reload();
+    });
     const students = {{ Illuminate\Support\Js::from($futurePaymentStudents) }};
     const months = {{ Illuminate\Support\Js::from($months) }};
     const currentPeriod = {{ now()->year * 12 + now()->month }};
@@ -297,7 +300,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                     </div>
                                 </td>
                                 <td><span class="arrears-class-chip">{{ $item->kelas->nama_kelas ?? '-' }}</span>
-                                    @include('partials.spp_coverage', ['coverage' => app(\App\Services\SppCoverageSummary::class)->summarize($item->tagihan)])
+                                    @include('partials.spp_coverage', ['coverage' => app(\App\Services\SppCoverageSummary::class)->summarize($item->tagihan), 'compact' => true])
                                 </td>
                                 <td>
                                     @if($unpaidBills->isNotEmpty())

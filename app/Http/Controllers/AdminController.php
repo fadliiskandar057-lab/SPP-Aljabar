@@ -662,13 +662,18 @@ class AdminController extends Controller
         abort_unless($pembayaran->metode === 'midtrans', 422);
 
         try {
-            $processor->process($pembayaran, $midtrans->getTransactionStatus($pembayaran), $notifications);
+            $status = $processor->process($pembayaran, $midtrans->getTransactionStatus($pembayaran), $notifications);
         } catch (\Throwable $exception) {
             report($exception);
             return response()->json(['ok' => false, 'message' => 'Status pembayaran belum dapat diverifikasi. Coba lagi beberapa saat.'], 422);
         }
 
-        return response()->json(['ok' => true, 'redirect' => route('treasury.arrears.students')]);
+        return response()->json([
+            'ok' => true,
+            'status' => $status,
+            'paid' => in_array($status, ['settlement', 'success'], true),
+            'redirect' => route('treasury.arrears.students'),
+        ]);
     }
 
     public function reopenArrearsBill(Siswa $siswa, Tagihan $tagihan)
