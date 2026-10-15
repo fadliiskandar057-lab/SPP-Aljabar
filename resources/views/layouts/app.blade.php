@@ -628,6 +628,7 @@
                         @elseif(auth()->user()->role === 'admin_tu')
                             <div class="nav-section-label">Admin Manajemen</div>
                             <a class="{{ request()->routeIs('admin.siswa*') ? 'active' : '' }}" href="{{ route('admin.siswa') }}"><i class="bi bi-people"></i>Data Siswa</a>
+                            <a class="{{ request()->routeIs('admin.progression*') ? 'active' : '' }}" href="{{ route('admin.progression.index') }}"><i class="bi bi-mortarboard"></i>Kenaikan &amp; Kelulusan</a>
                             <a class="{{ request()->routeIs('admin.settings','admin.kelas*','admin.tahun*','admin.biaya*') ? 'active' : '' }}" href="{{ route('admin.settings') }}"><i class="bi bi-sliders"></i>Pengaturan SPP</a>
                             <a class="{{ request()->routeIs('admin.users*') ? 'active' : '' }}" href="{{ route('admin.users') }}"><i class="bi bi-person-gear"></i>User Management</a>
                             <a class="{{ request()->routeIs('activities.*') ? 'active' : '' }}" href="{{ route('activities.index') }}"><i class="bi bi-clock-history"></i>Aktivitas Manajemen</a>

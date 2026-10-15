@@ -48,6 +48,11 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::middleware('role:admin_tu')->prefix('admin')->name('admin.')->group(function () {
+        Route::get('/kenaikan-kelas', [\App\Http\Controllers\StudentProgressionController::class, 'index'])->name('progression.index');
+        Route::post('/kenaikan-kelas/pratinjau', [\App\Http\Controllers\StudentProgressionController::class, 'preview'])->name('progression.preview');
+        Route::post('/kenaikan-kelas/konfirmasi', [\App\Http\Controllers\StudentProgressionController::class, 'confirm'])->name('progression.confirm');
+        Route::post('/tarif-semester', [\App\Http\Controllers\StudentProgressionController::class, 'storeRates'])->name('fee-rates.store');
+        Route::put('/kelas/{kelas}', [AdminController::class, 'updateKelas'])->name('kelas.update');
         Route::get('/pengaturan-spp', [AdminController::class, 'settings'])->name('settings');
         Route::get('/siswa', [AdminController::class, 'siswa'])->name('siswa');
         Route::get('/siswa/search', [AdminController::class, 'searchSiswa'])->name('siswa.search');

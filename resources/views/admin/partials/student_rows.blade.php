@@ -43,7 +43,7 @@
                 </div>
             </div>
         </td>
-        <td><span class="student-class-chip">{{ $item->kelas->nama_kelas ?? '-' }}</span></td>
+        <td><span class="student-class-chip">{{ $item->kelas->nama_kelas ?? '-' }}</span><div class="small text-muted">Angkatan {{ $item->angkatan ?? 'belum diisi' }}</div></td>
         <td><span class="student-muted-text">{{ $item->email ?? '-' }}</span></td>
         <td>
             <div class="student-parent-contact">
