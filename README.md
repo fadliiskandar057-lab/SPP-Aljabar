@@ -323,6 +323,8 @@ Ringkasan berdasarkan status tagihan, termasuk baseline/data demo, bukan hanya i
 - **Notifikasi:** lihat pemberitahuan dan tandai dibaca. Push perlu konfigurasi/izin terpisah.
 - **Aktivitas Manajemen:** mencatat aksi yang memanggil `ActivityLogger`, bukan seluruh perubahan database otomatis.
 
+Pelunasan kumulatif tunai/manual dan pembayaran Midtrans yang berhasil mencatat aktivitas dengan total nominal, jumlah bulan, dan daftar periode. Notifikasi memakai total seluruh invoice yang termasuk dalam pembayaran, meskipun pencatatan keuangan dipecah per bulan. Callback/webhook Midtrans berulang tidak membuat ulang aktivitas keberhasilan yang sudah tercatat. Untuk webhook tanpa pengguna login, pelaku aktivitas ditampilkan sebagai **Sistem**. Perubahan ini berlaku untuk pembayaran yang diproses setelah pembaruan; aktivitas historis yang sebelumnya tidak dicatat tidak otomatis dibuat ulang.
+
 ## Scheduler dan perawatan
 
 Jadwal pada [routes/console.php](routes/console.php):
@@ -444,6 +446,7 @@ php artisan test --filter=RoleAccessTest
 php artisan test --filter=AuthenticationIdentifierTest
 php artisan test --filter=FuturePaymentTest
 php artisan test --filter=SppCoverageSummaryTest
+php artisan test --filter=PaymentSummaryTest
 php artisan view:cache
 ```
 

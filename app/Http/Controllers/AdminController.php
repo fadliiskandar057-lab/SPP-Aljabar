@@ -511,7 +511,7 @@ class AdminController extends Controller
         return view('admin.future_payment_methods', compact('siswa', 'tagihan', 'bills'));
     }
 
-    public function confirmArrearsThrough(Request $request, Siswa $siswa, Tagihan $tagihan)
+    public function confirmArrearsThrough(Request $request, Siswa $siswa, Tagihan $tagihan, ActivityLogger $activities, WebNotificationService $notifications)
     {
         abort_unless($tagihan->siswa_id === $siswa->id, 404);
 
@@ -559,6 +559,18 @@ class AdminController extends Controller
             ]);
             $bill->update(['status' => 'lunas']);
             $lastPayment = $payment;
+        }
+
+        $total = (int) $bills->sum('nominal');
+        $periods = $bills->map(fn ($bill) => $bill->bulan.' '.$bill->tahun)->implode(', ');
+        $message = auth()->user()->name." mengonfirmasi pembayaran SPP {$siswa->nama} untuk {$bills->count()} bulan melalui tunai/manual, total Rp "
+            .number_format($total, 0, ',', '.').". Periode: {$periods}.";
+        $activities->record(auth()->user(), 'payment.arrears_settled', $lastPayment, $message, [
+            'total' => $total, 'months' => $bills->count(), 'periods' => $periods,
+        ]);
+        $notifications->toStudent($siswa->id, 'Pembayaran SPP dikonfirmasi', $message, route('siswa.riwayat'), 'success');
+        if ($siswa->kelas_id) {
+            $notifications->toClassGuardians($siswa->kelas_id, 'Pembayaran SPP siswa dikonfirmasi', $message, route('wali.payments'), 'success');
         }
 
         return redirect()

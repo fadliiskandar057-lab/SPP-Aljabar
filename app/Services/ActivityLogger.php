@@ -12,10 +12,10 @@ class ActivityLogger
     {
     }
 
-    public function record(User $actor, string $action, Model $subject, string $summary, array $metadata = [], ?string $url = null): ActivityLog
+    public function record(?User $actor, string $action, Model $subject, string $summary, array $metadata = [], ?string $url = null, bool $notify = true): ActivityLog
     {
         $activity = new ActivityLog([
-            'user_id' => $actor->id,
+            'user_id' => $actor?->id,
             'action' => $action,
             'summary' => $summary,
             'metadata' => $metadata,
@@ -23,6 +23,10 @@ class ActivityLogger
         ]);
         $activity->subject()->associate($subject);
         $activity->save();
+
+        if (! $notify) {
+            return $activity;
+        }
 
         $staff = User::whereIn('role', ['admin_tu', 'bendahara', 'kepala_sekolah'])->get();
         $this->notifications->toUsers($staff, 'Aktivitas manajemen', $summary, $url ?: route('activities.index'), 'info');

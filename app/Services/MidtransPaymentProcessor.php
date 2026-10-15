@@ -12,8 +12,9 @@ class MidtransPaymentProcessor
     {
         $status = $payload['transaction_status'] ?? 'pending';
         $notify = null;
+        $summary = null;
 
-        $payment = DB::transaction(function () use ($payment, $payload, $status, &$notify) {
+        $payment = DB::transaction(function () use ($payment, $payload, $status, &$notify, &$summary) {
             $locked = Pembayaran::with(['siswa.kelas', 'tagihan'])
                 ->lockForUpdate()->findOrFail($payment->id);
 
@@ -32,6 +33,24 @@ class MidtransPaymentProcessor
                 Pembayaran::where('tagihan_id', $locked->tagihan_id)->where('id', '!=', $locked->id)
                     ->where('status', 'pending')->update(['status' => 'cancelled']);
                 Pembayaran::resolveMultiBillPayment($locked);
+                if (! $wasPaid) {
+                    $parts = Pembayaran::with('tagihan')->where('siswa_id', $locked->siswa_id)
+                        ->where(function ($query) use ($locked) {
+                            $query->whereKey($locked->id);
+                            if ($locked->midtrans_order_id) {
+                                $query->orWhere('midtrans_order_id', 'like', $locked->midtrans_order_id.'-%');
+                            }
+                        })->whereIn('status', ['success', 'settlement'])->get();
+                    $summary = [
+                        'total' => (int) $parts->sum('nominal'),
+                        'months' => $parts->count(),
+                        'periods' => $parts->sortBy(fn ($part) => $part->tagihan->jatuh_tempo->format('Y-m-d'))
+                            ->map(fn ($part) => $part->tagihan->bulan.' '.$part->tagihan->tahun)->implode(', '),
+                    ];
+                    $message = "{$locked->siswa->nama} membayar SPP {$summary['months']} bulan melalui Midtrans, total Rp "
+                        .number_format($summary['total'], 0, ',', '.').". Periode: {$summary['periods']}. Invoice {$locked->kode_invoice}.";
+                    app(ActivityLogger::class)->record(auth()->user(), 'payment.midtrans_settled', $locked, $message, $summary, null, false);
+                }
                 $notify = $wasPaid ? null : 'success';
             } elseif (in_array($status, ['deny', 'cancel', 'expire', 'failure'], true)) {
                 $wasFailed = in_array($locked->status, ['failed', 'expired'], true);
@@ -45,7 +64,7 @@ class MidtransPaymentProcessor
         });
 
         if ($notify === 'success') {
-            $this->notifySuccess($payment, $notifications, $status);
+            $this->notifySuccess($payment, $notifications, $summary);
         } elseif ($notify === 'failure') {
             $this->notifyFailure($payment, $notifications, $status);
         }
@@ -53,16 +72,18 @@ class MidtransPaymentProcessor
         return $payment->status;
     }
 
-    private function notifySuccess(Pembayaran $payment, WebNotificationService $notifications, string $status): void
+    private function notifySuccess(Pembayaran $payment, WebNotificationService $notifications, array $summary): void
     {
         $student = $payment->siswa;
         $class = $student->kelas?->nama_kelas ?? '-';
-        $message = "{$student->nama} membayar melalui Midtrans. Kelas {$class}, tagihan {$payment->tagihan->bulan} {$payment->tagihan->tahun}, nominal Rp "
-            .number_format($payment->nominal, 0, ',', '.').", invoice {$payment->kode_invoice}, status {$status}.";
-        $notifications->toRole('bendahara', 'Pembayaran Midtrans berhasil', $message, route('treasury.payments'), 'success');
-        $notifications->toStudent($payment->siswa_id, 'Pembayaran online berhasil', "Pembayaran {$payment->tagihan->bulan} sudah tercatat lunas.", route('siswa.riwayat'), 'success');
+        $message = "{$student->nama}, kelas {$class}, membayar SPP {$summary['months']} bulan melalui Midtrans, total Rp "
+            .number_format($summary['total'], 0, ',', '.').". Periode: {$summary['periods']}. Invoice {$payment->kode_invoice}.";
+        $staff = \App\Models\User::whereIn('role', ['admin_tu', 'bendahara', 'kepala_sekolah'])->get();
+        $notifications->toUsers($staff, 'Pembayaran Midtrans berhasil', $message, route('activities.index'), 'success');
+        app(WebPushService::class)->sendToUsers($staff->load('pushSubscriptions'), 'Pembayaran Midtrans berhasil', $message, route('activities.index'));
+        $notifications->toStudent($payment->siswa_id, 'Pembayaran online berhasil', $message, route('siswa.riwayat'), 'success');
         if ($student->kelas_id) {
-            $notifications->toClassGuardians($student->kelas_id, 'Pembayaran Midtrans siswa berhasil', "{$student->nama} membayar {$payment->tagihan->bulan} via Midtrans sebesar Rp ".number_format($payment->nominal, 0, ',', '.').'.', route('wali.payments'), 'success');
+            $notifications->toClassGuardians($student->kelas_id, 'Pembayaran Midtrans siswa berhasil', $message, route('wali.payments'), 'success');
         }
     }
 
