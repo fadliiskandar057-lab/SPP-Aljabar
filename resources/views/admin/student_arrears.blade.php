@@ -161,7 +161,7 @@
                                     ->sortByDesc(fn ($bill) => sprintf('%04d%02d', $bill->tahun, array_search($bill->bulan, $months, true) ?: 1))
                                     ->take(12)
                                     ->values();
-                                $lastPayment = $item->pembayaran->where('status', 'success')->sortByDesc('paid_at')->first();
+                                $lastPayment = $item->pembayaran->whereIn('status', ['success', 'settlement'])->sortByDesc('paid_at')->first();
                                 $arrearsMonths = $unpaidBills->map(fn ($bill) => "{$bill->bulan} {$bill->tahun}")->implode(', ');
                                 $arrearsTotal = $unpaidBills->sum('nominal');
                                 $arrearsMessage = "Assalamu'alaikum Bapak/Ibu {$item->nama_orang_tua}, kami dari TU mengingatkan bahwa ananda {$item->nama} memiliki tunggakan SPP {$unpaidBills->count()} bulan: {$arrearsMonths}. Total tunggakan Rp ".number_format($arrearsTotal, 0, ',', '.').'. Mohon segera melakukan pembayaran. Terima kasih.';
@@ -176,7 +176,9 @@
                                         </div>
                                     </div>
                                 </td>
-                                <td><span class="arrears-class-chip">{{ $item->kelas->nama_kelas ?? '-' }}</span></td>
+                                <td><span class="arrears-class-chip">{{ $item->kelas->nama_kelas ?? '-' }}</span>
+                                    @include('partials.spp_coverage', ['coverage' => app(\App\Services\SppCoverageSummary::class)->summarize($item->tagihan)])
+                                </td>
                                 <td>
                                     @if($unpaidBills->isNotEmpty())
                                         <div class="arrears-bubbles">

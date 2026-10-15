@@ -14,6 +14,7 @@
         </div>
     </section>
 
+    @include('partials.spp_coverage')
     <section class="role-stat-grid">
         <div class="role-stat-card">
             <span class="role-stat-icon"><i class="bi bi-journal-text"></i></span>

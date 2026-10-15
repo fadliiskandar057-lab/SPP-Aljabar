@@ -439,7 +439,7 @@ class AdminController extends Controller
         return back()->with('success', "Tunggakan {$siswa->nama} disiapkan sampai {$this->months()[$targetMonth->month]} {$targetMonth->year}. {$result['created']} tagihan baru dibuat, {$result['baseline_paid']} tagihan lama ditandai sudah dibayar.");
     }
 
-    public function settleFuturePayments(Request $request, ActivityLogger $activities)
+    public function settleFuturePayments(Request $request)
     {
         $data = $request->validate([
             'siswa_id' => ['required', 'exists:siswa,id'],
@@ -452,31 +452,38 @@ class AdminController extends Controller
         $siswa = Siswa::with('kelas')->findOrFail($data['siswa_id']);
         abort_unless($siswa->status === 'aktif', 422);
         $until = Carbon::create($data['until_year'], $data['until_month'], 1)->startOfMonth();
+        if ($until->lt(now()->startOfMonth())) {
+            return back()->withInput()->withErrors(['until_month' => 'Pilih periode bulan ini atau periode mendatang.']);
+        }
         $fee = $this->feeForStudent($siswa, (int) $data['tahun_ajaran_id']);
         if (! $fee) return back()->withErrors(['biaya' => 'Biaya SPP siswa belum diatur.']);
 
-        $created = DB::transaction(function () use ($siswa, $data, $until, $fee) {
+        DB::transaction(function () use ($siswa, $data, $until, $fee) {
             $cursor = now()->startOfMonth();
-            $count = 0;
             while ($cursor->lte($until)) {
-                $bill = Tagihan::firstOrCreate([
+                Tagihan::firstOrCreate([
                     'siswa_id' => $siswa->id, 'tahun_ajaran_id' => $data['tahun_ajaran_id'],
                     'bulan' => $this->months()[$cursor->month], 'tahun' => $cursor->year,
                 ], ['nominal' => $fee->nominal, 'jatuh_tempo' => $cursor->copy()->day($this->scheduledDueDay()), 'status' => 'belum_lunas']);
-                if (! in_array($bill->status, ['lunas', 'gratis'], true)) {
-                    Pembayaran::firstOrCreate(['tagihan_id' => $bill->id, 'metode' => 'manual', 'status' => 'success'], [
-                        'siswa_id' => $siswa->id, 'kode_invoice' => 'INV-FUT-'.now()->format('YmdHis').'-'.$bill->id,
-                        'nominal' => $bill->nominal, 'paid_at' => filled($data['paid_at'] ?? null) ? Carbon::parse($data['paid_at']) : now(), 'verified_by' => auth()->id(),
-                    ]);
-                    $bill->update(['status' => 'lunas']); $count++;
-                }
                 $cursor->addMonth();
             }
-            return $count;
         });
 
-        $activities->record(auth()->user(), 'payment.future_settled', $siswa, auth()->user()->name." melunasi SPP masa depan {$siswa->nama} ({$siswa->nis}) sampai {$this->months()[$until->month]} {$until->year}; {$created} bulan diproses.", ['months' => $created], route('activities.index'));
-        return back()->with('success', "Pembayaran sampai {$this->months()[$until->month]} {$until->year} berhasil diproses untuk {$created} bulan.");
+        // Match the cumulative scope used by both existing payment handlers.
+        $bills = Tagihan::where('siswa_id', $siswa->id)
+            ->whereNotIn('status', ['lunas', 'gratis'])
+            ->get()
+            ->filter(fn ($bill) => Carbon::create((int) $bill->tahun, $this->monthNumber($bill->bulan), 1)->startOfMonth()->lte($until))
+            ->sortBy(fn ($bill) => sprintf('%04d%02d', $bill->tahun, $this->monthNumber($bill->bulan)))
+            ->values();
+
+        if ($bills->isEmpty()) {
+            return back()->withErrors(['tagihan' => 'Semua tagihan sampai periode yang dipilih sudah lunas atau gratis.']);
+        }
+
+        $tagihan = $bills->last();
+
+        return view('admin.future_payment_methods', compact('siswa', 'tagihan', 'bills'));
     }
 
     public function confirmArrearsThrough(Request $request, Siswa $siswa, Tagihan $tagihan)

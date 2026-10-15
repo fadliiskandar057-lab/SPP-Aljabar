@@ -11,6 +11,7 @@
         <div class="role-hero-actions"><span class="role-icon-tile"><i class="bi bi-receipt-cutoff"></i></span></div>
     </section>
 
+    @include('partials.spp_coverage')
     <div class="role-table-card">
         <div class="role-card-head">
         <div>

@@ -22,7 +22,8 @@ class SiswaPortalController extends Controller
             ->where('siswa_id', auth()->user()->siswa_id)
             ->latest()
             ->paginate(12);
-        return view('siswa.tagihan', compact('tagihan'));
+        $coverage = $this->sppCoverage();
+        return view('siswa.tagihan', compact('tagihan', 'coverage'));
     }
 
     public function history(MidtransPendingPaymentCleaner $midtransCleaner)
@@ -34,7 +35,8 @@ class SiswaPortalController extends Controller
             ->where('status', '!=', 'cancelled')
             ->latest()
             ->paginate(12);
-        return view('siswa.riwayat', compact('payments'));
+        $coverage = $this->sppCoverage();
+        return view('siswa.riwayat', compact('payments', 'coverage'));
     }
 
     public function profile(MidtransPendingPaymentCleaner $midtransCleaner)
@@ -52,6 +54,7 @@ class SiswaPortalController extends Controller
 
         return view('siswa.profil', [
             'siswa' => $siswa,
+            'coverage' => app(\App\Services\SppCoverageSummary::class)->summarize($tagihan),
             'summary' => [
                 'total_tagihan' => $tagihan->count(),
                 'lunas' => $tagihan->where('status', 'lunas')->count(),
@@ -60,6 +63,13 @@ class SiswaPortalController extends Controller
             ],
             'payments' => $payments,
         ]);
+    }
+
+    private function sppCoverage(): array
+    {
+        return app(\App\Services\SppCoverageSummary::class)->summarize(
+            Tagihan::where('siswa_id', auth()->user()->siswa_id)->get()
+        );
     }
 
     public function cash(Tagihan $tagihan, WebNotificationService $notifications, MidtransPendingPaymentCleaner $midtransCleaner)
