@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\BiayaSpp;
 use App\Models\Siswa;
 use App\Models\Tagihan;
 use App\Models\TagihanExemption;
@@ -24,15 +23,17 @@ class GenerateMonthlyBillsService
             ->where('tahun', $tahun)
             ->get();
 
-        foreach (Siswa::with('kelas')->where('status', 'aktif')->when($siswaId !== null, fn ($query) => $query->whereKey($siswaId))->get() as $siswa) {
-            $biaya = $this->feeForStudent($siswa, $tahunAjaranId);
-            if (! $biaya) {
+        $resolver = app(StudentFeeResolver::class);
+        $months = array_flip(['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']);
+        $period = \Carbon\Carbon::create($tahun, $months[$bulan] + 1, 1)->startOfMonth();
+        foreach (Siswa::with('kelas', 'feeRates', 'progressions')->where('status', 'aktif')->when($siswaId !== null, fn ($query) => $query->whereKey($siswaId))->get() as $siswa) {
+            $baseNominal = $resolver->nominal($siswa, $tahunAjaranId, $period);
+            if ($baseNominal === null) {
                 $stats['skipped_no_fee']++;
                 continue;
             }
 
-            $baseNominal = (int) $biaya->nominal;
-            $exemption = $this->matchingExemption($exemptions, $siswa);
+            $exemption = $this->matchingExemption($exemptions, $siswa, $resolver->classAt($siswa, $period)['id']);
             $nominal = $this->discountedNominal($baseNominal, $exemption);
             $status = $nominal === 0 ? 'gratis' : 'belum_lunas';
 
@@ -45,6 +46,8 @@ class GenerateMonthlyBillsService
                 'nominal' => $nominal,
                 'jatuh_tempo' => $jatuhTempo,
                 'status' => $status,
+                'kelas_nama' => $resolver->classAt($siswa, $period)['name'],
+                'kelas_id' => $resolver->classAt($siswa, $period)['id'],
             ]);
 
             if (! $tagihan->wasRecentlyCreated) {
@@ -63,30 +66,13 @@ class GenerateMonthlyBillsService
         return $stats;
     }
 
-    private function feeForStudent(Siswa $siswa, int $tahunAjaranId): ?BiayaSpp
-    {
-        $fee = BiayaSpp::where('tahun_ajaran_id', $tahunAjaranId)
-            ->where(fn ($query) => $query->where('kelas_id', $siswa->kelas_id)->orWhereNull('kelas_id'))
-            ->orderByRaw('kelas_id is null asc')
-            ->first();
-
-        if ($fee) {
-            return $fee;
-        }
-
-        return BiayaSpp::where(fn ($query) => $query->where('kelas_id', $siswa->kelas_id)->orWhereNull('kelas_id'))
-            ->orderByRaw('kelas_id is null asc')
-            ->latest('tahun_ajaran_id')
-            ->first();
-    }
-
-    private function matchingExemption($exemptions, Siswa $siswa): ?TagihanExemption
+    private function matchingExemption($exemptions, Siswa $siswa, int $classId): ?TagihanExemption
     {
         return $exemptions
-            ->filter(function (TagihanExemption $exemption) use ($siswa) {
+            ->filter(function (TagihanExemption $exemption) use ($siswa, $classId) {
                 return match ($exemption->scope_type) {
                     'siswa' => $exemption->siswa_id === $siswa->id,
-                    'kelas' => $exemption->kelas_id === $siswa->kelas_id,
+                    'kelas' => $exemption->kelas_id === $classId,
                     default => true,
                 };
             })

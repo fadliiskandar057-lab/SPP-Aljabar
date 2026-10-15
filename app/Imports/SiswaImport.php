@@ -46,9 +46,24 @@ class SiswaImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
                 $status = 'aktif';
             }
 
+            $academic = [];
+            $cohort = $this->stringValue($this->cell($row, ['angkatan', 'tahun_masuk']));
+            if ($cohort !== '') {
+                if (! ctype_digit($cohort) || (int) $cohort < 1901 || (int) $cohort > 2155) {
+                    $this->skipped++;
+                    $this->errors[] = "Baris {$rowNumber} dilewati: angkatan harus berupa tahun yang valid.";
+                    continue;
+                }
+                $academic['angkatan'] = (int) $cohort;
+            }
+            $academicYear = $this->stringValue($this->cell($row, ['tahun_ajaran']));
+            if ($academicYear !== '') {
+                $academic['tahun_ajaran_id'] = \App\Models\TahunAjaran::firstOrCreate(['nama' => $academicYear], ['is_active' => false])->id;
+            }
+
             $siswa = Siswa::updateOrCreate(
                 ['nis' => $nis],
-                [
+                $academic + [
                     'nama' => $nama,
                     'email' => $email ?: null,
                     'kelas_id' => $kelas->id,

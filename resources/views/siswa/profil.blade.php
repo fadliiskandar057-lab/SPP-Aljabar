@@ -41,6 +41,8 @@
             <div class="text-muted">{{ $siswa->nis }} - {{ $siswa->kelas->nama_kelas ?? '-' }}</div>
             <div class="mt-3"><x-status :status="$siswa->status"/></div>
             <div class="profile-mini-list mt-4">
+                <div><span>Angkatan Masuk</span><strong>{{ $siswa->angkatan ?? 'Belum diisi' }}</strong></div>
+                <div><span>Tahun Ajaran Kelas Aktif / Terakhir</span><strong>{{ $siswa->tahunAjaran?->nama ?? 'Belum diisi' }}</strong></div>
                 <div><span>Orang Tua</span><strong>{{ $siswa->nama_orang_tua ?: '-' }}</strong></div>
                 <div><span>WhatsApp</span><strong>{{ $siswa->no_hp_orang_tua ?: '-' }}</strong></div>
                 <div><span>Alamat</span><strong>{{ $siswa->alamat ?: '-' }}</strong></div>
@@ -57,6 +59,7 @@
             @include('partials.payments_table', ['payments' => $payments, 'tableId' => 'profilePaymentsTable'])
         </div>
     </section>
+    <section class="role-table-card"><div class="role-card-head"><div><h6>Riwayat Kelas</h6><span>Angkatan tetap sama ketika naik kelas.</span></div></div><div class="table-responsive"><table class="table mb-0"><thead><tr><th>Tahun ajaran</th><th>Kelas asal</th><th>Kelas tujuan / status</th><th>Berlaku mulai</th></tr></thead><tbody>@forelse($siswa->progressions->sortByDesc('effective_from') as $entry)<tr><td>{{ $entry->targetYear->nama }}</td><td>{{ $entry->from_class_name }}</td><td>{{ $entry->to_class_name ?? ucfirst($entry->action) }}</td><td>{{ $entry->effective_from->format('m/Y') }}</td></tr>@empty<tr><td colspan="4" class="empty-state">Belum ada riwayat kenaikan kelas.</td></tr>@endforelse</tbody></table></div></section>
 </div>
 
 <style>

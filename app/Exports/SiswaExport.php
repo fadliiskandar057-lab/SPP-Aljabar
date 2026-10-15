@@ -19,12 +19,14 @@ class SiswaExport implements FromArray, WithHeadings
             'no_hp_orang_tua',
             'alamat',
             'status',
+            'angkatan',
+            'tahun_ajaran',
         ];
     }
 
     public function array(): array
     {
-        return Siswa::with('kelas')
+        return Siswa::with('kelas', 'tahunAjaran')
             ->orderBy('nama')
             ->get()
             ->map(fn (Siswa $siswa) => [
@@ -36,6 +38,8 @@ class SiswaExport implements FromArray, WithHeadings
                 $siswa->no_hp_orang_tua,
                 $siswa->alamat,
                 $siswa->status,
+                $siswa->angkatan,
+                $siswa->tahunAjaran?->nama,
             ])
             ->all();
     }

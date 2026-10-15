@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\AutoBillSetting;
-use App\Models\BiayaSpp;
 use App\Models\Pembayaran;
 use App\Models\Siswa;
 use App\Models\Tagihan;
@@ -27,12 +26,8 @@ class FuturePaymentService
         if (! $year) {
             throw ValidationException::withMessages(['until' => 'Tahun ajaran aktif belum diatur. Hubungi TU.']);
         }
-        $fees = BiayaSpp::where(fn ($q) => $q->where('kelas_id', $student->kelas_id)->orWhereNull('kelas_id'))
-            ->orderByRaw('kelas_id is null asc')->latest('tahun_ajaran_id')->get();
-        $fee = $fees->firstWhere('tahun_ajaran_id', $year->id) ?? $fees->first();
-        if (! $fee) {
-            throw ValidationException::withMessages(['until' => 'Biaya SPP belum diatur. Hubungi TU.']);
-        }
+        $resolver = app(StudentFeeResolver::class);
+        $student->loadMissing('feeRates', 'progressions', 'kelas');
         if (Pembayaran::where('siswa_id', $student->id)->where('status', 'pending')->whereNotNull('future_plan')->exists()) {
             throw ValidationException::withMessages(['until' => 'Masih ada pembayaran masa depan yang menunggu. Selesaikan atau batalkan melalui Riwayat Pembayaran.']);
         }
@@ -51,17 +46,21 @@ class FuturePaymentService
                     throw ValidationException::withMessages(['until' => 'Ada tagihan dalam periode pilihan yang sedang menunggu konfirmasi.']);
                 }
                 if (! in_array($bill->status, ['lunas', 'gratis'], true)) {
-                    $items[] = ['id' => $bill->id] + $bill->only(['siswa_id', 'tahun_ajaran_id', 'bulan', 'tahun', 'nominal'])
+                    $items[] = ['id' => $bill->id] + $bill->only(['siswa_id', 'tahun_ajaran_id', 'bulan', 'tahun', 'nominal', 'kelas_nama', 'kelas_id'])
                         + ['jatuh_tempo' => $bill->jatuh_tempo->toDateString()];
                 }
             }
             if ($recorded->isEmpty()) {
+                $periodClass = $resolver->classAt($student, $cursor);
                 $exemption = $exemptions->get($key, collect())->filter(fn ($item) => match ($item->scope_type) {
                     'siswa' => $item->siswa_id === $student->id,
-                    'kelas' => $item->kelas_id === $student->kelas_id,
+                    'kelas' => $item->kelas_id === $periodClass['id'],
                     default => true,
                 })->sortByDesc(fn ($item) => match ($item->scope_type) {'siswa' => 3, 'kelas' => 2, default => 1})->first();
-                $base = (int) $fee->nominal;
+                $base = $resolver->nominal($student, $year->id, $cursor);
+                if ($base === null) {
+                    throw ValidationException::withMessages(['until' => 'Biaya SPP belum diatur. Hubungi TU.']);
+                }
                 $amount = match ($exemption?->benefit_type) {
                     'free' => 0,
                     'nominal' => max(0, $base - (int) $exemption->amount),
@@ -70,6 +69,8 @@ class FuturePaymentService
                 };
                 $items[] = ['id' => null, 'siswa_id' => $student->id, 'tahun_ajaran_id' => $year->id,
                     'bulan' => $month, 'tahun' => $cursor->year, 'nominal' => $amount,
+                    'kelas_nama' => $periodClass['name'],
+                    'kelas_id' => $periodClass['id'],
                     'jatuh_tempo' => $cursor->copy()->day($dueDay)->toDateString()];
             }
             $cursor->addMonth();
@@ -91,6 +92,11 @@ class FuturePaymentService
         $existing = Tagihan::where('siswa_id', $payment->siswa_id)->lockForUpdate()->get();
         $inserts = [];
         foreach ($items as $item) {
+            if (! isset($item['kelas_id'], $item['kelas_nama'])) {
+                $class = app(StudentFeeResolver::class)->classAt($payment->siswa, Carbon::parse($item['jatuh_tempo'])->startOfMonth());
+                $item['kelas_id'] = $class['id'];
+                $item['kelas_nama'] = $class['name'];
+            }
             $matches = $existing->filter(fn ($bill) => $bill->bulan === $item['bulan'] && (int) $bill->tahun === (int) $item['tahun']);
             if ($matches->isEmpty()) {
                 unset($item['id']);

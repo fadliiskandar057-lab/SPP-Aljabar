@@ -51,7 +51,7 @@ class AdminController extends Controller
             ->orderBy('nama')
             ->get();
         $searchResult = $search->searchStudents($all, $request->input('keyword') ?? '');
-        return view('admin.siswa', ['siswa' => $searchResult['results'], 'meta' => $searchResult, 'kelas' => Kelas::all()]);
+        return view('admin.siswa', ['siswa' => $searchResult['results'], 'meta' => $searchResult, 'kelas' => Kelas::all(), 'tahunList' => TahunAjaran::all()]);
     }
 
     public function searchSiswa(Request $request, SequentialSearchService $search)
@@ -63,7 +63,7 @@ class AdminController extends Controller
         $result = $search->searchStudents($all, $request->input('keyword') ?? '');
 
         return response()->json([
-            'html' => view('admin.partials.student_rows', ['siswa' => $result['results'], 'kelas' => Kelas::all()])->render(),
+            'html' => view('admin.partials.student_rows', ['siswa' => $result['results'], 'kelas' => Kelas::all(), 'tahunList' => TahunAjaran::all()])->render(),
             'checked' => $result['checked'],
             'duration_ms' => $result['duration_ms'],
             'count' => $result['results']->count(),
@@ -76,6 +76,8 @@ class AdminController extends Controller
             'nis' => ['required', 'unique:siswa,nis'],
             'nama' => ['required'], 'email' => ['nullable', 'email'],
             'kelas_id' => ['required', 'exists:kelas,id'],
+            'angkatan' => ['nullable', 'integer', 'between:1901,2155'],
+            'tahun_ajaran_id' => ['nullable', 'exists:tahun_ajaran,id'],
             'nama_orang_tua' => ['required'], 'no_hp_orang_tua' => ['required'],
             'alamat' => ['nullable'], 'status' => ['required', 'in:aktif,lulus,keluar'],
         ]);
@@ -122,6 +124,8 @@ class AdminController extends Controller
             'nis' => ['required', 'unique:siswa,nis,'.$siswa->id],
             'nama' => ['required'], 'email' => ['nullable', 'email'],
             'kelas_id' => ['required', 'exists:kelas,id'],
+            'angkatan' => ['nullable', 'integer', 'between:1901,2155'],
+            'tahun_ajaran_id' => ['nullable', 'exists:tahun_ajaran,id'],
             'nama_orang_tua' => ['required'], 'no_hp_orang_tua' => ['required'],
             'alamat' => ['nullable'], 'status' => ['required', 'in:aktif,lulus,keluar'],
         ]);
@@ -175,8 +179,29 @@ class AdminController extends Controller
 
     public function storeKelas(Request $request)
     {
-        Kelas::create($request->validate(['nama_kelas' => ['required', 'max:50']]));
+        Kelas::create($this->classData($request));
         return back()->with('success', 'Kelas tersimpan.');
+    }
+
+    public function updateKelas(Request $request, Kelas $kelas)
+    {
+        $kelas->update($this->classData($request));
+        return back()->with('success', 'Data kelas diperbarui. Nama kelas pada tagihan lama tetap sama.');
+    }
+
+    private function classData(Request $request): array
+    {
+        $data = $request->validate(['nama_kelas' => ['required', 'max:50'],
+            'jenjang' => ['nullable', 'in:SD,SMP,SMA,SMK'], 'tingkat' => ['nullable', 'integer', 'between:1,12'],
+            'jurusan' => ['nullable', 'string', 'max:100']]);
+        $ranges = ['SD' => [1, 6], 'SMP' => [7, 9], 'SMA' => [10, 12], 'SMK' => [10, 12]];
+        if (filled($data['jenjang'] ?? null) && filled($data['tingkat'] ?? null)) {
+            [$min, $max] = $ranges[$data['jenjang']];
+            if ($data['tingkat'] < $min || $data['tingkat'] > $max) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['tingkat' => "Tingkat {$data['jenjang']} harus {$min} sampai {$max}."]);
+            }
+        }
+        return $data;
     }
 
     public function tahunAjaran()
@@ -207,7 +232,9 @@ class AdminController extends Controller
 
     public function destroyTahunAjaran(TahunAjaran $tahunAjaran)
     {
-        if ($tahunAjaran->tagihan()->exists() || BiayaSpp::where('tahun_ajaran_id', $tahunAjaran->id)->exists()) {
+        if ($tahunAjaran->tagihan()->exists() || BiayaSpp::where('tahun_ajaran_id', $tahunAjaran->id)->exists()
+            || \App\Models\StudentProgression::where('to_year_id', $tahunAjaran->id)->exists()
+            || \App\Models\StudentFeeRate::where('tahun_ajaran_id', $tahunAjaran->id)->exists()) {
             return back()->withErrors(['tahun' => 'Tahun ajaran tidak bisa dihapus karena masih dipakai tagihan atau biaya SPP.']);
         }
 
@@ -473,10 +500,10 @@ class AdminController extends Controller
         if ($until->lt(now()->startOfMonth())) {
             return back()->withInput()->withErrors(['until_month' => 'Pilih periode bulan ini atau periode mendatang.']);
         }
-        $fee = $this->feeForStudent($siswa, (int) $data['tahun_ajaran_id']);
-        if (! $fee) return back()->withErrors(['biaya' => 'Biaya SPP siswa belum diatur.']);
+        $resolver = app(\App\Services\StudentFeeResolver::class);
+        if ($resolver->nominal($siswa, (int) $data['tahun_ajaran_id'], $until) === null) return back()->withErrors(['biaya' => 'Biaya SPP siswa belum diatur.']);
 
-        DB::transaction(function () use ($siswa, $data, $until, $fee) {
+        DB::transaction(function () use ($siswa, $data, $until, $resolver) {
             $existingBills = $siswa->tagihan()->get();
             $cursor = app(\App\Services\SppCoverageSummary::class)->nextPaymentMonth($existingBills);
             $existingPeriods = $existingBills->mapWithKeys(fn ($bill) => [
@@ -485,10 +512,16 @@ class AdminController extends Controller
             while ($cursor->lte($until)) {
                 // A period already recorded under another academic year must not be billed again.
                 if (! $existingPeriods->has($cursor->format('Ym'))) {
+                    $nominal = $resolver->nominal($siswa, (int) $data['tahun_ajaran_id'], $cursor);
+                    if ($nominal === null) {
+                        throw \Illuminate\Validation\ValidationException::withMessages(['biaya' => 'Biaya SPP periode pilihan belum diatur.']);
+                    }
                     Tagihan::firstOrCreate([
                         'siswa_id' => $siswa->id, 'tahun_ajaran_id' => $data['tahun_ajaran_id'],
                         'bulan' => $this->months()[$cursor->month], 'tahun' => $cursor->year,
-                    ], ['nominal' => $fee->nominal, 'jatuh_tempo' => $cursor->copy()->day($this->scheduledDueDay()), 'status' => 'belum_lunas']);
+                    ], ['nominal' => $nominal, 'jatuh_tempo' => $cursor->copy()->day($this->scheduledDueDay()),
+                        'status' => $nominal > 0 ? 'belum_lunas' : 'gratis', 'kelas_nama' => $resolver->classAt($siswa, $cursor)['name'],
+                        'kelas_id' => $resolver->classAt($siswa, $cursor)['id']]);
                 }
                 $cursor->addMonth();
             }
@@ -925,7 +958,7 @@ class AdminController extends Controller
     {
         $query = Tagihan::with('siswa.kelas', 'pembayaran', 'tahunAjaran');
         if ($request->filled('bulan')) $query->where('bulan', $request->bulan);
-        if ($request->filled('kelas_id')) $query->whereHas('siswa', fn ($q) => $q->where('kelas_id', $request->kelas_id));
+        if ($request->filled('kelas_id')) $query->where('kelas_id', $request->kelas_id);
         if ($request->filled('status')) $query->where('status', $request->status);
         $tagihan = $query->latest()->get();
 
@@ -983,7 +1016,7 @@ class AdminController extends Controller
     private function monthlyReportRows($tagihan)
     {
         return $tagihan
-            ->groupBy(fn ($bill) => $bill->siswa_id.'|'.$this->reportStatusGroup($bill->status))
+            ->groupBy(fn ($bill) => $bill->siswa_id.'|'.$bill->kelas_id.'|'.$bill->kelas_nama.'|'.$this->reportStatusGroup($bill->status))
             ->map(function ($bills) {
                 $sorted = $bills
                     ->sortBy(fn ($bill) => sprintf('%04d%02d', $bill->tahun, $this->monthNumber($bill->bulan)))
@@ -993,6 +1026,7 @@ class AdminController extends Controller
 
                 return [
                     'siswa' => $first->siswa,
+                    'kelas_nama' => $first->kelas_nama ?? $first->siswa->kelas->nama_kelas,
                     'status' => $status,
                     'status_label' => $status === 'belum_lunas' ? 'Belum Lunas' : ucwords(str_replace('_', ' ', $status)),
                     'bulan_awal' => $sorted->first()->bulan.' '.$sorted->first()->tahun,
@@ -1029,7 +1063,7 @@ class AdminController extends Controller
     {
         $query = Tagihan::with('siswa.kelas', 'pembayaran', 'tahunAjaran');
         if ($request->filled('bulan')) $query->where('bulan', $request->bulan);
-        if ($request->filled('kelas_id')) $query->whereHas('siswa', fn ($q) => $q->where('kelas_id', $request->kelas_id));
+        if ($request->filled('kelas_id')) $query->where('kelas_id', $request->kelas_id);
         if ($request->filled('status')) $query->where('status', $request->status);
         if ($request->filled('keyword')) {
             $keyword = $request->keyword;
@@ -1115,7 +1149,7 @@ class AdminController extends Controller
     {
         $query = Tagihan::with('siswa.kelas', 'pembayaran', 'tahunAjaran');
         if ($request->filled('bulan')) $query->where('bulan', $request->bulan);
-        if ($request->filled('kelas_id')) $query->whereHas('siswa', fn ($q) => $q->where('kelas_id', $request->kelas_id));
+        if ($request->filled('kelas_id')) $query->where('kelas_id', $request->kelas_id);
         if ($request->filled('status')) $query->where('status', $request->status);
         if ($request->filled('keyword')) {
             $keyword = $request->keyword;
@@ -1299,28 +1333,12 @@ class AdminController extends Controller
         User::create($payload + ['password' => Hash::make('password')]);
     }
 
-    private function feeForStudent(Siswa $siswa, int $tahunAjaranId): ?BiayaSpp
-    {
-        $fee = BiayaSpp::where('tahun_ajaran_id', $tahunAjaranId)
-            ->where(fn ($query) => $query->where('kelas_id', $siswa->kelas_id)->orWhereNull('kelas_id'))
-            ->orderByRaw('kelas_id is null asc')
-            ->first();
-
-        if ($fee) {
-            return $fee;
-        }
-
-        return BiayaSpp::where(fn ($query) => $query->where('kelas_id', $siswa->kelas_id)->orWhereNull('kelas_id'))
-            ->orderByRaw('kelas_id is null asc')
-            ->latest('tahun_ajaran_id')
-            ->first();
-    }
-
     private function prepareArrearsForStudent(Siswa $siswa, int $tahunAjaranId, Carbon $lastPaid, Carbon $targetMonth, int $dueDay): array
     {
-        $biaya = $this->feeForStudent($siswa, $tahunAjaranId);
+        $resolver = app(\App\Services\StudentFeeResolver::class);
+        $nominal = $resolver->nominal($siswa, $tahunAjaranId, $targetMonth);
 
-        if (! $biaya) {
+        if ($siswa->status !== 'aktif' || $nominal === null) {
             return ['created' => 0, 'baseline_paid' => 0, 'skipped' => true];
         }
 
@@ -1335,15 +1353,21 @@ class AdminController extends Controller
         $created = 0;
 
         while ($cursor->lte($targetMonth)) {
+            $nominal = $resolver->nominal($siswa, $tahunAjaranId, $cursor);
+            if ($nominal === null) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['biaya' => 'Tarif SPP periode tunggakan belum tersedia.']);
+            }
             $bill = Tagihan::firstOrCreate([
                 'siswa_id' => $siswa->id,
                 'tahun_ajaran_id' => $tahunAjaranId,
                 'bulan' => $this->months()[$cursor->month],
                 'tahun' => $cursor->year,
             ], [
-                'nominal' => $biaya->nominal,
+                'nominal' => $nominal,
                 'jatuh_tempo' => $cursor->copy()->day($dueDay)->toDateString(),
-                'status' => 'belum_lunas',
+                'status' => $nominal > 0 ? 'belum_lunas' : 'gratis',
+                'kelas_nama' => $resolver->classAt($siswa, $cursor)['name'],
+                'kelas_id' => $resolver->classAt($siswa, $cursor)['id'],
             ]);
 
             if ($bill->wasRecentlyCreated) {

@@ -127,7 +127,7 @@
                                 <i class="bi bi-chevron-right"></i>
                             </button>
                         </td>
-                        <td>{{ $row['siswa']->kelas->nama_kelas }}</td>
+                        <td>{{ $row['kelas_nama'] }}</td>
                         <td><x-status :status="$row['status']"/></td>
                         <td><span class="report-range">{{ $row['bulan_awal'] }} - {{ $row['bulan_akhir'] }}</span></td>
                         <td><span class="report-month-count">{{ $row['jumlah_bulan'] }} bulan</span></td>

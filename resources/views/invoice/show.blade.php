@@ -8,7 +8,7 @@
     </div>
     <dl class="row">
         <dt class="col-sm-3">Nama Siswa</dt><dd class="col-sm-9">{{ $payment->siswa->nama }}</dd>
-        <dt class="col-sm-3">NIS / Kelas</dt><dd class="col-sm-9">{{ $payment->siswa->nis }} / {{ $payment->siswa->kelas->nama_kelas }}</dd>
+        <dt class="col-sm-3">NIS / Kelas</dt><dd class="col-sm-9">{{ $payment->siswa->nis }} / {{ $payment->tagihan->kelas_nama ?? $payment->siswa->kelas->nama_kelas }}</dd>
         <dt class="col-sm-3">Bulan SPP</dt><dd class="col-sm-9">@if($payment->future_plan){{ count($payment->future_plan['items']) }} bulan sampai {{ \Carbon\Carbon::createFromFormat('!Y-m', $payment->future_plan['until'])->locale('id')->translatedFormat('F Y') }}@else{{ $payment->tagihan->bulan }} {{ $payment->tagihan->tahun }}@endif</dd>
         <dt class="col-sm-3">Nominal</dt><dd class="col-sm-9">Rp {{ number_format($payment->future_plan['total'] ?? $payment->nominal,0,',','.') }}</dd>
         <dt class="col-sm-3">Metode</dt><dd class="col-sm-9">{{ strtoupper($payment->metode) }}</dd>

@@ -331,7 +331,7 @@
                     <tr>
                         <td>{{ $row['siswa']->nis }}</td>
                         <td>{{ $row['siswa']->nama }}</td>
-                        <td>{{ $row['siswa']->kelas->nama_kelas }}</td>
+                        <td>{{ $row['kelas_nama'] }}</td>
                         <td class="text-center"><span class="status {{ $statusClass }}">{{ $row['status_label'] }}</span></td>
                         <td><span class="range-pill">{{ $row['bulan_awal'] }} - {{ $row['bulan_akhir'] }}</span></td>
                         <td class="text-center">{{ $row['jumlah_bulan'] }} bulan</td>
@@ -370,7 +370,7 @@
                         <tr>
                             <td>{{ $row['siswa']->nis }}</td>
                             <td>{{ $row['siswa']->nama }}</td>
-                            <td>{{ $row['siswa']->kelas->nama_kelas }}</td>
+                            <td>{{ $row['kelas_nama'] }}</td>
                             <td>{{ $detail['bulan'] }}</td>
                             <td class="text-right">Rp {{ number_format($detail['nominal'], 0, ',', '.') }}</td>
                             <td class="text-center"><span class="status {{ $statusClass }}">{{ str_replace('_', ' ', $detail['status']) }}</span></td>

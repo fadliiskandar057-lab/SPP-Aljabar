@@ -91,7 +91,7 @@ class SiswaPortalController extends Controller
     {
         $midtransCleaner->deleteExpired();
 
-        $siswa = auth()->user()->siswa->load('kelas');
+        $siswa = auth()->user()->siswa->load('kelas', 'tahunAjaran', 'progressions.targetYear');
         $tagihan = Tagihan::where('siswa_id', $siswa->id)->latest()->get();
         $payments = Pembayaran::with('tagihan')
             ->where('siswa_id', $siswa->id)

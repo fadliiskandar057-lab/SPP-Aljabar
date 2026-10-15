@@ -15,7 +15,7 @@ class SequentialSearchService
 
         foreach ($students as $student) {
             $checked++;
-            $haystack = mb_strtolower($student->nis.' '.$student->nama.' '.$student->email.' '.optional($student->kelas)->nama_kelas);
+            $haystack = mb_strtolower($student->nis.' '.$student->nama.' '.$student->email.' '.optional($student->kelas)->nama_kelas.' '.$student->angkatan.' '.$student->status);
 
             if ($keyword === '' || str_contains($haystack, $keyword)) {
                 $results->push($student);

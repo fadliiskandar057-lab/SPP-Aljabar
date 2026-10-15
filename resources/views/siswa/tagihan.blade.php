@@ -12,6 +12,7 @@
     </section>
 
     @include('partials.spp_coverage')
+    @if(auth()->user()->siswa?->status === 'aktif')
     <section class="role-table-card" id="bayar-masa-depan" aria-labelledby="futurePaymentTitle">
         <div class="role-card-head">
             <div>
@@ -42,6 +43,9 @@
             </div>
         </div>
     </section>
+    @else
+        <p class="alert alert-info">Status siswa {{ auth()->user()->siswa?->status }}. Tidak ada tagihan baru; kamu tetap dapat menyelesaikan tagihan lama dan melihat riwayat.</p>
+    @endif
     <div class="role-table-card">
         <div class="role-card-head">
         <div>

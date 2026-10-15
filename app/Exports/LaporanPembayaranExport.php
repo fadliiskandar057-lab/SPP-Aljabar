@@ -43,7 +43,7 @@ class LaporanPembayaranExport implements FromArray, ShouldAutoSize, WithStyles
             $rows[] = [
                 $row['siswa']->nis ?? '-',
                 $row['siswa']->nama ?? '-',
-                $row['siswa']->kelas->nama_kelas ?? '-',
+                $row['kelas_nama'] ?? '-',
                 $row['status_label'],
                 $row['bulan_awal'].' - '.$row['bulan_akhir'],
                 $row['jumlah_bulan'],
@@ -60,7 +60,7 @@ class LaporanPembayaranExport implements FromArray, ShouldAutoSize, WithStyles
                 $rows[] = [
                     $row['siswa']->nis ?? '-',
                     $row['siswa']->nama ?? '-',
-                    $row['siswa']->kelas->nama_kelas ?? '-',
+                    $row['kelas_nama'] ?? '-',
                     $row['status_label'],
                     $detail['bulan'],
                     $detail['nominal'],

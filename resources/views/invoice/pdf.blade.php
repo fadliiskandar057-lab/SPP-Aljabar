@@ -264,7 +264,7 @@
         </tr>
         <tr>
             <td class="detail-label">Kelas</td>
-            <td class="detail-value">{{ $payment->siswa->kelas->nama_kelas }}</td>
+            <td class="detail-value">{{ $payment->tagihan->kelas_nama ?? $payment->siswa->kelas->nama_kelas }}</td>
         </tr>
     </table>
 
