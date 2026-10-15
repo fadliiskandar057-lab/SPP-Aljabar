@@ -15,6 +15,7 @@ README ini mengikuti route, controller, service, migration, seeder, dan skrip pr
 - [Akun demo](#akun-demo)
 - [Persiapan data oleh Admin TU](#persiapan-data-oleh-admin-tu)
 - [Panduan Bendahara](#panduan-bendahara)
+  - [Buka ulang tagihan](#buka-ulang-tagihan)
 - [Panduan siswa dan orang tua](#panduan-siswa-dan-orang-tua)
 - [Status dan batas pelunasan](#status-dan-batas-pelunasan)
 - [Laporan, akun, dan notifikasi](#laporan-akun-dan-notifikasi)
@@ -273,7 +274,25 @@ Manual mencatat pembayaran per tagihan. Midtrans kumulatif memakai transaksi gab
 
 Di **Antrian Tunai**, cari invoice pengajuan siswa, cocokkan nominal, terima uang, lalu konfirmasi. Pengajuan siswa belum melunasi tagihan.
 
-Di **Transaksi Pembayaran**, catat manual, cari riwayat, buka invoice, atau batalkan transaksi yang diizinkan. Bubble hijau pada Tunggakan Siswa menyediakan buka ulang dengan konfirmasi. Periksa dampak transaksi terkait; koreksi mengikuti pemeriksaan metode/status pada controller.
+Di **Transaksi Pembayaran**, catat manual, cari riwayat, buka invoice, atau batalkan transaksi yang diizinkan. Untuk salah input pada tagihan, gunakan langkah Buka Ulang Tagihan berikut.
+
+### Buka ulang tagihan
+
+Fitur ini digunakan **Bendahara** untuk mengoreksi tagihan yang salah ditandai selesai. Aksi berlaku pada satu tagihan yang dipilih, bukan seluruh pembayaran beberapa bulan sekaligus.
+
+1. Buka **Tunggakan Siswa** dan cari siswa terkait.
+2. Pada bagian tagihan sudah lunas, klik bubble hijau bulan yang ingin dikoreksi. Daftar menampilkan maksimal 12 periode selesai terbaru, termasuk bulan gratis.
+3. Popup **Buka ulang tagihan?** menampilkan nama siswa, NIS, periode, dan nominal. Periksa agar tidak mengubah tagihan siswa atau bulan yang salah.
+4. Baca dampak pembukaan ulang: transaksi **manual terakhir yang berhasil**, jika ada, akan menjadi `cancelled`; status tagihan menjadi `belum_lunas` dan kembali masuk tunggakan.
+5. Pilih **Ya, Buka Ulang** untuk menyimpan koreksi. Pilih **Batal** atau tutup popup untuk keluar tanpa perubahan.
+
+Tombol konfirmasi dinonaktifkan selama pengiriman agar tidak terkirim dua kali. Jika tagihan mempunyai pembayaran **tunai atau Midtrans** berstatus `success`/`settlement`, popup menampilkan peringatan dan tautan **Transaksi Pembayaran**; pembukaan ulang langsung dinonaktifkan. Pemeriksaan yang sama tetap dilakukan oleh server.
+
+Membuka menu Transaksi Pembayaran bukan berarti setiap transaksi dapat dibatalkan: ikuti aksi yang tersedia dan pembatasan aplikasi. **Buka ulang tagihan tidak melakukan pengembalian dana Midtrans.** Bila tidak ada transaksi manual, misalnya tagihan baseline atau gratis, pembukaan ulang hanya mengubah status tagihan dengan nominal yang sudah tersimpan.
+
+Contoh: pembayaran manual Januari–Maret dibuat sebagai tiga invoice. Membuka ulang Februari hanya membatalkan transaksi manual terakhir untuk Februari dan mengembalikan tagihan Februari ke tunggakan; Januari dan Maret tetap selesai. Keterangan Lunas sampai mengikuti urutan tagihan setelah koreksi.
+
+Popup ini tersedia pada [reopen_bill_modal.blade.php](resources/views/admin/partials/reopen_bill_modal.blade.php). Alur buka ulang saat ini belum memanggil pencatatan aktivitas; jangan menyamakannya dengan aktivitas pelunasan yang dijelaskan di bawah.
 
 ## Panduan siswa dan orang tua
 
@@ -300,6 +319,8 @@ Status transaksi berbeda: `pending`, `settlement`, `success`, `failed`, `expired
 
 Ringkasan tersedia di **Bendahara > Tunggakan Siswa** serta halaman siswa **Tagihan Saya**, **Riwayat Pembayaran**, dan **Profil**. Perhitungan memakai semua tagihan siswa, bukan hanya halaman tabel terlihat.
 
+Daftar tunggakan Bendahara menggunakan tampilan ringkas satu baris **Lunas sampai: [bulan tahun]**. Penjelasan periode, tunggakan, dan bulan awal pembayaran tersedia ketika siswa dipilih pada modal Bayar Masa Depan. Halaman siswa tetap menampilkan ringkasan yang lebih lengkap.
+
 - **Lunas sampai:** bulan selesai berurutan sejak awal data. `lunas` dan `gratis` dihitung selesai.
 - Bulan belum selesai atau celah bulan yang belum tercatat menghentikan batas.
 - **Periode lunas paling akhir:** muncul jika ada bulan selesai setelah urutan terputus.
@@ -324,6 +345,10 @@ Ringkasan berdasarkan status tagihan, termasuk baseline/data demo, bukan hanya i
 - **Aktivitas Manajemen:** mencatat aksi yang memanggil `ActivityLogger`, bukan seluruh perubahan database otomatis.
 
 Pelunasan kumulatif tunai/manual dan pembayaran Midtrans yang berhasil mencatat aktivitas dengan total nominal, jumlah bulan, dan daftar periode. Notifikasi memakai total seluruh invoice yang termasuk dalam pembayaran, meskipun pencatatan keuangan dipecah per bulan. Callback/webhook Midtrans berulang tidak membuat ulang aktivitas keberhasilan yang sudah tercatat. Untuk webhook tanpa pengguna login, pelaku aktivitas ditampilkan sebagai **Sistem**. Perubahan ini berlaku untuk pembayaran yang diproses setelah pembaruan; aktivitas historis yang sebelumnya tidak dicatat tidak otomatis dibuat ulang.
+
+Contoh: pembayaran tiga bulan dengan nominal masing-masing Rp 250.000 ditampilkan sebagai **3 bulan, total Rp 750.000**, disertai periode yang dibayar. Jumlah bulan adalah jumlah tagihan dalam pembayaran tersebut, bukan jumlah seluruh transaksi siswa sepanjang waktu. Invoice bulanan tetap tersimpan terpisah untuk laporan.
+
+Untuk Midtrans, notifikasi keberhasilan dikirim ke Admin TU, Bendahara, Kepala Sekolah, siswa terkait, dan Wali Kelas terkait jika ada. Pelunasan tunai/manual kumulatif menggunakan notifikasi aktivitas untuk staf manajemen serta notifikasi konfirmasi untuk siswa/Wali Kelas. Pending atau sekadar menyiapkan tagihan masa depan belum dicatat sebagai pelunasan berhasil.
 
 ## Scheduler dan perawatan
 
@@ -460,7 +485,17 @@ node --test tests/JavaScript/midtrans-finish.test.cjs
 
 Setelah callback Snap, aplikasi memeriksa status server hingga lima kali. Halaman kembali ke daftar hanya setelah pembayaran terverifikasi berhasil; jika masih pending atau verifikasi gagal, tombol Periksa Status Pembayaran tersedia. Daftar tunggakan yang dipulihkan dari riwayat browser dimuat ulang untuk memperbarui status.
 
-Skenario penerimaan: login lima peran, siapkan tagihan, konfirmasi tunai, selesaikan Sandbox, periksa invoice, bayar masa depan, cocokkan Lunas sampai, buka/ekspor laporan.
+Skenario penerimaan:
+
+1. Login lima peran dan periksa pembatasan menu/data.
+2. Siapkan tagihan, konfirmasi tunai, dan selesaikan pembayaran Midtrans Sandbox.
+3. Bayar beberapa bulan, cocokkan total invoice dengan nominal/jumlah bulan pada aktivitas dan notifikasi.
+4. Buka Bayar Masa Depan, ganti siswa, periksa batas lunas, tunggakan, dan bulan awal pembayaran.
+5. Pastikan halaman pembayaran menunggu verifikasi; jika masih pending/gagal, tersedia tombol Periksa Status Pembayaran.
+6. Setelah berhasil, cocokkan warna/status bulan dan Lunas sampai tanpa refresh manual.
+7. Buka popup koreksi tagihan manual; periksa rincian, uji Batal, lalu uji konfirmasi pada data uji.
+8. Pastikan pembayaran tunai/Midtrans sah tidak dapat dibuka ulang langsung dari popup.
+9. Buka dan ekspor laporan, cocokkan data setelah pembayaran/koreksi.
 
 ## Pemecahan masalah
 
@@ -484,6 +519,9 @@ Skenario penerimaan: login lima peran, siapkan tagihan, konfirmasi tunai, selesa
 | Lunas tanpa invoice | Dapat berasal dari baseline Set Terakhir Bayar/data demo. |
 | Pending online menghilang | Cleaner menghapus pending melewati batas. |
 | PDF laporan gagal | Periksa penandatangan Kepala Sekolah. |
+| Tombol Buka Ulang dinonaktifkan | Tagihan memiliki pembayaran tunai/Midtrans sah; gunakan alur koreksi yang tersedia pada Transaksi Pembayaran. |
+| Aktivitas pembayaran lama tidak ada | Pembaruan mencatat keberhasilan baru, tidak membuat ulang aktivitas historis otomatis. |
+| Notifikasi hanya berisi satu bulan pada data lama | Notifikasi lama tidak dihitung ulang. Pembayaran kumulatif baru memakai total semua invoice terkait. |
 
 Baca validasi dan `storage/logs/laravel.log` pada lokal. Untuk `LOG_CHANNEL=stderr`, baca log hosting. Samarkan rahasia/data pribadi sebelum membagikan log.
 
