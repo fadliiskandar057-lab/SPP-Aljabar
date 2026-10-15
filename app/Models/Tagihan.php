@@ -7,7 +7,18 @@ use Illuminate\Database\Eloquent\Model;
 class Tagihan extends Model
 {
     protected $table = 'tagihan';
-    protected $fillable = ['siswa_id', 'tahun_ajaran_id', 'bulan', 'tahun', 'nominal', 'jatuh_tempo', 'status'];
+    protected $fillable = ['siswa_id', 'tahun_ajaran_id', 'bulan', 'tahun', 'nominal', 'jatuh_tempo', 'status', 'kelas_nama', 'kelas_id'];
+
+    protected static function booted(): void
+    {
+        static::creating(function (Tagihan $bill) {
+            if ($bill->kelas_nama === null) {
+                $student = $bill->siswa;
+                $bill->kelas_nama = $student?->kelas?->nama_kelas;
+            }
+            $bill->kelas_id ??= $bill->siswa?->kelas_id;
+        });
+    }
 
     protected function casts(): array
     {
