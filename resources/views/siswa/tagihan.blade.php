@@ -17,7 +17,7 @@
             <div>
                 <span class="role-kicker"><i class="bi bi-calendar-plus" aria-hidden="true"></i>Rencanakan Pembayaran</span>
                 <h6 id="futurePaymentTitle">Bayar Masa Depan</h6>
-                <span>Siapkan SPP lebih awal, hingga 12 bulan mendatang.</span>
+                <span>Siapkan SPP untuk beberapa bulan atau beberapa tahun sekaligus.</span>
             </div>
             <span class="role-icon-tile" aria-hidden="true"><i class="bi bi-calendar-check"></i></span>
         </div>
@@ -32,7 +32,7 @@
                         @csrf
                         <label for="futurePaymentUntil" class="form-label fw-semibold">Periode akhir pembayaran</label>
                         <div class="d-flex flex-wrap gap-2">
-                            <input type="month" id="futurePaymentUntil" name="until" class="form-control w-auto flex-grow-1 @error('until') is-invalid @enderror" min="{{ now()->format('Y-m') }}" max="{{ now()->startOfMonth()->addMonths(12)->format('Y-m') }}" value="{{ old('until', now()->addMonthNoOverflow()->format('Y-m')) }}" aria-describedby="futurePaymentHelp @error('until') futurePaymentError @enderror" required>
+                            <input type="month" id="futurePaymentUntil" name="until" class="form-control w-auto flex-grow-1 @error('until') is-invalid @enderror" min="{{ now()->format('Y-m') }}" max="{{ now()->startOfMonth()->addYears(100)->format('Y-m') }}" value="{{ old('until', now()->addMonthNoOverflow()->format('Y-m')) }}" aria-describedby="futurePaymentHelp @error('until') futurePaymentError @enderror" required>
                             <button class="btn btn-primary" type="submit"><i class="bi bi-arrow-right-circle" aria-hidden="true"></i>Siapkan Tagihan</button>
                         </div>
                         @error('until')<p class="text-danger small mt-2 mb-0" id="futurePaymentError" role="alert">{{ $message }}</p>@enderror

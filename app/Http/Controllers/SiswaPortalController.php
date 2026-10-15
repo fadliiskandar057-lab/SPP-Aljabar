@@ -18,8 +18,8 @@ class SiswaPortalController extends Controller
     {
         $data = $request->validate(['until' => ['required', 'date_format:Y-m']]);
         $until = \Carbon\Carbon::createFromFormat('!Y-m', $data['until']);
-        if ($until->lt(now()->startOfMonth()) || $until->gt(now()->startOfMonth()->addMonths(12))) {
-            return back()->withInput()->withErrors(['until' => 'Pilih periode bulan ini hingga 12 bulan mendatang.']);
+        if ($until->lt(now()->startOfMonth()) || $until->gt(now()->startOfMonth()->addYears(100))) {
+            return back()->withInput()->withErrors(['until' => 'Pilih periode bulan ini hingga 100 tahun mendatang.']);
         }
         $siswa = auth()->user()->siswa;
         abort_unless($siswa && $siswa->status === 'aktif', 403);

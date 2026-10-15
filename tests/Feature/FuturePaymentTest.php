@@ -34,10 +34,18 @@ class FuturePaymentTest extends TestCase
         $this->assertDatabaseCount('pembayaran', 0);
         $this->post(route('siswa.future-payment'), $data)->assertRedirect(route('siswa.tagihan'));
         $this->assertDatabaseCount('tagihan', 3);
-        foreach (['2026-09', '2027-11', 'invalid'] as $until) {
+        foreach (['2026-09', '2126-11', 'invalid'] as $until) {
             $this->post(route('siswa.future-payment'), ['until' => $until])->assertSessionHasErrors('until');
         }
         $this->assertDatabaseCount('tagihan', 3);
+        $this->post(route('siswa.future-payment'), ['until' => '2029-10'])->assertRedirect(route('siswa.tagihan'));
+        $this->assertDatabaseCount('tagihan', 37);
+        $this->post(route('siswa.future-payment'), ['until' => '2038-10'])->assertRedirect(route('siswa.tagihan'));
+        $this->assertDatabaseCount('tagihan', 145);
+        $this->assertDatabaseHas('tagihan', ['siswa_id' => $student->id, 'bulan' => 'Oktober', 'tahun' => 2038, 'status' => 'belum_lunas']);
+        $this->post(route('siswa.future-payment'), ['until' => '2038-10'])->assertRedirect(route('siswa.tagihan'));
+        $this->assertDatabaseCount('tagihan', 145);
+        $this->assertDatabaseCount('pembayaran', 0);
         $this->travelBack();
     }
 
