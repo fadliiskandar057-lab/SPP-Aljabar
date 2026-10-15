@@ -9,7 +9,7 @@ use App\Models\TagihanExemption;
 
 class GenerateMonthlyBillsService
 {
-    public function generate(int $tahunAjaranId, string $bulan, int $tahun, string $jatuhTempo): array
+    public function generate(int $tahunAjaranId, string $bulan, int $tahun, string $jatuhTempo, ?int $siswaId = null): array
     {
         $stats = [
             'created' => 0,
@@ -24,7 +24,7 @@ class GenerateMonthlyBillsService
             ->where('tahun', $tahun)
             ->get();
 
-        foreach (Siswa::with('kelas')->where('status', 'aktif')->get() as $siswa) {
+        foreach (Siswa::with('kelas')->where('status', 'aktif')->when($siswaId !== null, fn ($query) => $query->whereKey($siswaId))->get() as $siswa) {
             $biaya = $this->feeForStudent($siswa, $tahunAjaranId);
             if (! $biaya) {
                 $stats['skipped_no_fee']++;

@@ -14,6 +14,33 @@ class FuturePaymentTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_student_can_prepare_only_their_own_future_bills_without_paying(): void
+    {
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-10-15'));
+        $kelas = Kelas::create(['nama_kelas' => 'X']);
+        $year = TahunAjaran::create(['nama' => '2026/2027', 'is_active' => true]);
+        BiayaSpp::create(['kelas_id' => $kelas->id, 'tahun_ajaran_id' => $year->id, 'nominal' => 100000]);
+        $attributes = ['nama' => 'Siswa', 'kelas_id' => $kelas->id, 'nama_orang_tua' => 'Wali', 'no_hp_orang_tua' => '0800000000', 'status' => 'aktif'];
+        $student = Siswa::create($attributes + ['nis' => 'ST-FUT-1']);
+        $other = Siswa::create($attributes + ['nis' => 'ST-FUT-2']);
+        $user = User::create(['name' => 'Siswa', 'username' => 'student-future', 'password' => bcrypt('password'), 'role' => 'siswa', 'siswa_id' => $student->id]);
+
+        $this->actingAs($user)->get(route('siswa.tagihan'))->assertOk()->assertSee('Bayar Masa Depan');
+        $data = ['until' => '2026-12', 'siswa_id' => $other->id];
+        $this->post(route('siswa.future-payment'), $data)->assertRedirect(route('siswa.tagihan'));
+        $this->assertDatabaseCount('tagihan', 3);
+        $this->assertDatabaseMissing('tagihan', ['siswa_id' => $other->id]);
+        $this->assertDatabaseMissing('tagihan', ['status' => 'lunas']);
+        $this->assertDatabaseCount('pembayaran', 0);
+        $this->post(route('siswa.future-payment'), $data)->assertRedirect(route('siswa.tagihan'));
+        $this->assertDatabaseCount('tagihan', 3);
+        foreach (['2026-09', '2027-11', 'invalid'] as $until) {
+            $this->post(route('siswa.future-payment'), ['until' => $until])->assertSessionHasErrors('until');
+        }
+        $this->assertDatabaseCount('tagihan', 3);
+        $this->travelBack();
+    }
+
     public function test_preparing_future_payments_shows_methods_without_settling_bills(): void
     {
         $this->travelTo(\Illuminate\Support\Carbon::parse('2026-10-15'));

@@ -14,6 +14,46 @@ use Illuminate\Support\Str;
 
 class SiswaPortalController extends Controller
 {
+    public function prepareFuturePayment(Request $request, \App\Services\GenerateMonthlyBillsService $generator)
+    {
+        $data = $request->validate(['until' => ['required', 'date_format:Y-m']]);
+        $until = \Carbon\Carbon::createFromFormat('!Y-m', $data['until']);
+        if ($until->lt(now()->startOfMonth()) || $until->gt(now()->startOfMonth()->addMonths(12))) {
+            return back()->withInput()->withErrors(['until' => 'Pilih periode bulan ini hingga 12 bulan mendatang.']);
+        }
+        $siswa = auth()->user()->siswa;
+        abort_unless($siswa && $siswa->status === 'aktif', 403);
+        $year = \App\Models\TahunAjaran::where('is_active', true)->first();
+        if (! $year) {
+            return back()->withInput()->withErrors(['until' => 'Tahun ajaran aktif belum diatur. Hubungi TU.']);
+        }
+
+        $stats = \Illuminate\Support\Facades\DB::transaction(function () use ($siswa, $year, $until, $generator) {
+            $siswa->newQuery()->whereKey($siswa->id)->lockForUpdate()->firstOrFail();
+            $existing = $siswa->tagihan()->get();
+            $cursor = app(\App\Services\SppCoverageSummary::class)->nextPaymentMonth($existing);
+            $created = $missingFee = 0;
+            while ($cursor->lte($until)) {
+                $month = $cursor->copy()->locale('id')->translatedFormat('F');
+                if (! $existing->contains(fn ($bill) => (int) $bill->tahun === $cursor->year && $bill->bulan === $month)) {
+                    $dueDay = max(1, min(28, (int) (\App\Models\AutoBillSetting::first()?->due_day ?? 10)));
+                    $result = $generator->generate($year->id, $month, $cursor->year, $cursor->copy()->day($dueDay)->toDateString(), $siswa->id);
+                    $created += $result['created'];
+                    $missingFee += $result['skipped_no_fee'];
+                }
+                $cursor->addMonth();
+            }
+            return compact('created', 'missingFee');
+        });
+
+        if ($stats['missingFee']) {
+            return back()->withInput()->withErrors(['until' => 'Biaya SPP belum diatur. Hubungi TU.']);
+        }
+        return redirect()->route('siswa.tagihan')->with('success', $stats['created']
+            ? 'Tagihan sampai periode pilihan siap. Pilih Online atau Tunai pada setiap bulan yang ingin dibayar.'
+            : 'Periode pilihan sudah tercatat. Pilih Online atau Tunai pada tagihan yang belum lunas.');
+    }
+
     public function bills(MidtransPendingPaymentCleaner $midtransCleaner)
     {
         $midtransCleaner->deleteExpired();

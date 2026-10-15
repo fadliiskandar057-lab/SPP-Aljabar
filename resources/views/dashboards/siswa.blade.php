@@ -23,6 +23,7 @@
         </div>
         <div class="role-hero-actions">
             <a href="{{ route('siswa.tagihan') }}" class="btn btn-primary"><i class="bi bi-receipt"></i>Bayar Tagihan</a>
+            <a href="{{ route('siswa.tagihan') }}#bayar-masa-depan" class="btn btn-outline-primary"><i class="bi bi-calendar-plus"></i>Bayar Masa Depan</a>
             <a href="{{ route('siswa.riwayat') }}" class="btn btn-outline-primary"><i class="bi bi-clock-history"></i>Riwayat</a>
         </div>
     </section>
